@@ -21,4 +21,8 @@ pipenv install
 pipenv run python simple_azure_device_simulator.py
 ```
 
-https://learn.microsoft.com/en-us/azure/iot-hub/quickstart-bicep-route-messages?toc=%2Fazure%2Fazure-resource-manager%2Fbicep%2Ftoc.json&view=iotedge-1.5
+Deploy the Bicep file using Azure CLI
+```
+az group create --name cloud-computing --location eastus
+az deployment group create --resource-group cloud-computing --template-file main.bicep --parameters appInsightsLocation=<app-location>
+```
