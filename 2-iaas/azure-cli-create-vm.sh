@@ -3,7 +3,7 @@
 # Variables
 RESOURCE_GROUP="myResourceGroupVM"
 LOCATION="uksouth"
-VM_NAME="myVM"
+VM_NAME="my-vm"
 IMAGE="Ubuntu2204"
 SIZE="Standard_B1s"
 
