@@ -1,7 +1,7 @@
 ## Azure Blob Storage
 
-Task: Host a static website in Azure Storage
-
-https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website-how-to?tabs=azure-portal
-
-https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website-host
+1. Follow commands from `azure-cli-blob-website.sh` in the Azure Cloud Shell
+2. Proof that the website is visible
+3. Delete the `index.html` file from the blob storage
+4. Check the website if the `error.html` is visible
+5. Delete resource group
