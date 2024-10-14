@@ -5,6 +5,7 @@ from azure.cosmos.partition_key import PartitionKey
 import datetime
 
 import config
+import random
 
 # ----------------------------------------------------------------------------------------------------------
 # Sample - demonstrates the basic CRUD operations on a Item resource for Azure Cosmos
@@ -14,20 +15,6 @@ HOST = config.settings['host']
 MASTER_KEY = config.settings['master_key']
 DATABASE_ID = config.settings['database_id']
 CONTAINER_ID = config.settings['container_id']
-
-
-def create_items(container):
-    print('\nCreating Items\n')
-
-    # Create a SalesOrder object. This object has nested properties and various types including numbers, DateTimes and strings.
-    # This can be saved as JSON as is without converting into rows/columns.
-    sales_order = get_sales_order("SalesOrder1")
-    container.create_item(body=sales_order)
-
-    # As your app evolves, let's say your object has a new schema. You can insert SalesOrderV2 objects without any
-    # changes to the database tier.
-    sales_order2 = get_sales_order_v2("SalesOrder2")
-    container.create_item(body=sales_order2)
 
 
 def read_item(container, doc_id, account_number):
@@ -153,6 +140,37 @@ def get_sales_order_v2(item_id):
               }
 
     return order2
+
+
+def create_items(container):
+    print('\nCreating Items\n')
+
+    # Create a SalesOrder object. This object has nested properties and various types including numbers, DateTimes and strings.
+    # This can be saved as JSON as is without converting into rows/columns.
+    try:
+        sales_order_id = 'SalesOrder1'
+        sales_order = get_sales_order(sales_order_id)
+        container.create_item(body=sales_order)
+
+    except exceptions.CosmosResourceExistsError:
+        print(f"Sales order with id {sales_order_id} was found")
+        delete_item(container, sales_order_id, 'Account1')
+        container.create_item(body=sales_order)
+
+    # As your app evolves, let's say your object has a new schema. You can insert SalesOrderV2 objects without any
+    # changes to the database tier.
+    # Generate a random sales order ID
+    sales_order_id = f"SalesOrder{random.randint(2, 100)}"
+    print(f"Creating a sales order with ID {sales_order_id}")
+    sales_order2 = get_sales_order_v2(sales_order_id)
+    container.create_item(body=sales_order2)
+
+    # As your app evolves, let's say your object has a new schema. You can insert SalesOrderV2 objects without any
+    # changes to the database tier.
+    sales_order_id = f"SalesOrder{random.randint(2, 100)}"
+    print(f"Creating a sales order with ID {sales_order_id}")
+    sales_order3 = get_sales_order(sales_order_id)
+    container.create_item(body=sales_order3)
 
 
 def run_sample():
