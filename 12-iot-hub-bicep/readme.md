@@ -23,6 +23,6 @@ pipenv run python simple_azure_device_simulator.py
 
 Deploy the Bicep file using Azure CLI
 ```
-az group create --name cloud-computing --location eastus
-az deployment group create --resource-group cloud-computing --template-file main.bicep --parameters appInsightsLocation=<app-location>
+az group create --name cloud-computing-iot-hub --location uksouth
+az deployment group create --resource-group cloud-computing-iot-hub --template-file main.bicep
 ```
