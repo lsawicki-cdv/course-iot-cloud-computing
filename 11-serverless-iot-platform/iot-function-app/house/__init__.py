@@ -33,9 +33,26 @@ def main(req: HttpRequest) -> HttpResponse:
             # Convert items to JSON
             items_json = [dict(item) for item in items]
 
+            # Filter out the system properties
+            for item in items_json:
+                item.pop("_rid", None)
+                item.pop("_self", None)
+                item.pop("_etag", None)
+                item.pop("_attachments", None)
+                item.pop("_ts", None)
+
+            # Encode the JSON in UTF-8
+            items_json = json.dumps(
+                items_json, indent=True, ensure_ascii=False)
+
             return HttpResponse(
-                body=json.dumps(items_json),
+                body=items_json,
                 status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",  # Add CORS header
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Allow methods
+                    "Access-Control-Allow-Headers": "Content-Type"  # Allow headers
+                },
                 mimetype="application/json"
             )
         except exceptions.CosmosHttpResponseError as e:
@@ -78,6 +95,11 @@ def main(req: HttpRequest) -> HttpResponse:
         return HttpResponse(
             json.dumps({'message': 'House entity created successfully'}),
             status_code=201,
+            headers={
+                "Access-Control-Allow-Origin": "*",  # Add CORS header
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Allow methods
+                "Access-Control-Allow-Headers": "Content-Type"  # Allow headers
+            },
             mimetype='application/json'
         )
     except exceptions.CosmosHttpResponseError as e:
