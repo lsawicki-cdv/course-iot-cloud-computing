@@ -13,7 +13,9 @@ pip install -r requirements.txt
 
 func init --python
 
-func new --name devices --template "HTTP trigger" --authlevel "anonymous"
+func new --name device --template "HTTP trigger" --authlevel "function"
+
+func new --name house --template "HTTP trigger" --authlevel "function"
 
 # For local testing
 func start 

@@ -17,7 +17,12 @@ container = database.get_container_client(container_name)
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
+    # Check if the request is a GET request
+    if req.method != "GET":
+        return func.HttpResponse(
+            "Please make a GET request",
+            status_code=400
+        )
 
     device_id = req.params.get('device_id')
 
@@ -32,6 +37,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         # Convert items to JSON
         items_json = [dict(item) for item in items]
+
+        if not items_json:
+            return func.HttpResponse(
+                "No data found for the given device_id",
+                status_code=404
+            )
 
         return func.HttpResponse(
             body=str(items_json),
