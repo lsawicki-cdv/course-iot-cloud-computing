@@ -73,8 +73,5 @@ az storage account create --name $STORAGE_ACCOUNT_NAME --resource-group $RESOURC
 # Create a Function App for the IoT Platform API (Python)
 az functionapp create --resource-group $RESOURCE_GROUP --consumption-plan-location $LOCATION --name $FUNCTION_APP_NAME --storage-account $STORAGE_ACCOUNT_NAME --runtime python --functions-version 4 --os-type Linux
 
-# Deploy the Function App code
-az functionapp deployment source config-zip --resource-group $RESOURCE_GROUP --name $FUNCTION_APP_NAME --src functionapp.zip
-
 # Create an API Management instance
 az apim create --name $API_MANAGEMENT_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --publisher-email lukasz.sawicki@cdv.pl --publisher-name lsawicki-cdv

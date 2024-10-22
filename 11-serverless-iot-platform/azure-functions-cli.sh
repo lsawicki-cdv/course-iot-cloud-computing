@@ -17,6 +17,8 @@ func new --name device --template "HTTP trigger" --authlevel "function"
 
 func new --name house --template "HTTP trigger" --authlevel "function"
 
+func new --name rooms --template "HTTP trigger" --authlevel "function"
+
 # For local testing
 func start 
 

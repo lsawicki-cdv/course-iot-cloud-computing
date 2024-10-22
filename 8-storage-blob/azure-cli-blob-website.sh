@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Variables
-RESOURCE_GROUP_NAME="myResourceGroupWebsite"
-STORAGE_ACCOUNT_NAME="mystorageaccount$RANDOM"
+RESOURCE_GROUP_NAME="myResourceGroupFrontend"
+STORAGE_ACCOUNT_NAME="mystorageaccountfrontend"
 LOCATION="uksouth"
 
 # Create a resource group
