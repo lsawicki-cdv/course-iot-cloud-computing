@@ -39,6 +39,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Convert items to JSON
         items_json = [dict(item) for item in items]
 
+        if not items_json:
+            return func.HttpResponse(
+                "No data found for the given device_id",
+                status_code=404
+            )
+
         # Filter out the system properties
         for item in items_json:
             item.pop("_rid", None)
@@ -49,12 +55,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         # Encode the JSON in UTF-8
         items_json = json.dumps(items_json, indent=True, ensure_ascii=False)
-
-        if not items_json:
-            return func.HttpResponse(
-                "No data found for the given device_id",
-                status_code=404
-            )
 
         return func.HttpResponse(
             body=items_json,

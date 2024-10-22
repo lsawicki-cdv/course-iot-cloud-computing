@@ -33,6 +33,12 @@ def main(req: HttpRequest) -> HttpResponse:
             # Convert items to JSON
             items_json = [dict(item) for item in items]
 
+            if not items_json:
+                return HttpResponse(
+                    "No data found for the given house id",
+                    status_code=404
+                )
+
             # Filter out the system properties
             for item in items_json:
                 item.pop("_rid", None)
@@ -67,52 +73,51 @@ def main(req: HttpRequest) -> HttpResponse:
                 "Error querying Cosmos DB",
                 status_code=500
             )
-
     # Check if the request is a POST request
-    if req.method != 'POST':
+    elif req.method == 'POST':
+        try:
+            # Parse the request body
+            req_body = req.get_json()
+
+            print(req_body)
+
+            # Create the house entity
+            house_data = {
+                'id': req_body.get('id'),
+                'houseid': req_body.get('name'),
+                'location': req_body.get('location'),
+            }
+
+            # Create the house entity in the Cosmos DB container
+            container.create_item(body=house_data)
+
+            return HttpResponse(
+                json.dumps({'message': 'House entity created successfully'}),
+                status_code=201,
+                headers={
+                    "Access-Control-Allow-Origin": "*",  # Add CORS header
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Allow methods
+                    "Access-Control-Allow-Headers": "Content-Type"  # Allow headers
+                },
+                mimetype='application/json'
+            )
+        except exceptions.CosmosHttpResponseError as e:
+            logging.error(f'Error creating house entity: {e}')
+            return HttpResponse(
+                json.dumps({'error': 'Failed to create house entity'}),
+                status_code=500,
+                mimetype='application/json'
+            )
+        except ValueError as e:
+            logging.error(f'Invalid request body: {e}')
+            return HttpResponse(
+                json.dumps({'error': 'Invalid request body'}),
+                status_code=400,
+                mimetype='application/json'
+            )
+    else:
         return HttpResponse(
-            'Please make a POST request',
-            status_code=400,
-            mimetype='application/json'
-        )
-
-    try:
-        # Parse the request body
-        req_body = req.get_json()
-
-        print(req_body)
-
-        # Create the house entity
-        house_data = {
-            'id': req_body.get('id'),
-            'houseid': req_body.get('name'),
-            'location': req_body.get('location'),
-        }
-
-        # Create the house entity in the Cosmos DB container
-        container.create_item(body=house_data)
-
-        return HttpResponse(
-            json.dumps({'message': 'House entity created successfully'}),
-            status_code=201,
-            headers={
-                "Access-Control-Allow-Origin": "*",  # Add CORS header
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Allow methods
-                "Access-Control-Allow-Headers": "Content-Type"  # Allow headers
-            },
-            mimetype='application/json'
-        )
-    except exceptions.CosmosHttpResponseError as e:
-        logging.error(f'Error creating house entity: {e}')
-        return HttpResponse(
-            json.dumps({'error': 'Failed to create house entity'}),
-            status_code=500,
-            mimetype='application/json'
-        )
-    except ValueError as e:
-        logging.error(f'Invalid request body: {e}')
-        return HttpResponse(
-            json.dumps({'error': 'Invalid request body'}),
+            'Invalid request method',
             status_code=400,
             mimetype='application/json'
         )

@@ -33,6 +33,12 @@ def main(req: HttpRequest) -> HttpResponse:
             # Convert items to JSON
             items_json = [dict(item) for item in items]
 
+            if not items_json:
+                return HttpResponse(
+                    "No data found for the given room id",
+                    status_code=404
+                )
+
             # Filter out the system properties
             for item in items_json:
                 item.pop("_rid", None)
