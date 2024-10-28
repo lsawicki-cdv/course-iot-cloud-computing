@@ -6,6 +6,9 @@ ACI_NAME="mycontainertest"
 ACI_IMAGE="my-custom-app:1.0.0"
 LOCATION="eastus"
 
+# Authenticate the Azure CLI
+az login
+
 # Create a resource group
 az group create --name $RESOURCE_GROUP --location $LOCATION
 
@@ -18,6 +21,8 @@ az acr login --name $ACI_NAME
 # Push the Docker image to the container registry
 docker tag $ACI_IMAGE $ACI_NAME.azurecr.io/$ACI_IMAGE
 docker push $ACI_NAME.azurecr.io/$ACI_IMAGE
+
+# !!! Check if the container image is available in the Azure portal in the container registry
 
 # Create a container instance from the Docker image
 az acr update -n $ACI_NAME --admin-enabled true

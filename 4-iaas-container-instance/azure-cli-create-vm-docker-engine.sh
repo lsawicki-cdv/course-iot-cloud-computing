@@ -19,22 +19,6 @@ az vm create \
     --admin-username azureuser \
     --generate-ssh-keys
 
-# List network security group rules
-az network nsg rule list \
-  --resource-group $RESOURCE_GROUP \
-  --nsg-name ${VM_NAME}NSG \
-  --output table
-
-# Create network security group rule to allow TCP traffic on port 1883
-az network nsg rule create \
-  --resource-group $RESOURCE_GROUP \
-  --nsg-name ${VM_NAME}NSG \
-  --name allow-mqtt \
-  --protocol tcp \
-  --priority 1020 \
-  --destination-port-range 1883 \
-  --access allow
-
 # Install Docker engine on the VM
 az vm extension set \
   --resource-group $RESOURCE_GROUP \
@@ -53,7 +37,17 @@ az vm extension set \
   --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh"]}' \
   --protected-settings '{"commandToExecute": "./install-azure-cli.sh"}'
 
-  # Get public IP address
+# Create network security group rule
+az network nsg rule create \
+  --resource-group $RESOURCE_GROUP \
+  --nsg-name ${VM_NAME}NSG \
+  --name allow-http \
+  --protocol tcp \
+  --priority 1020 \
+  --destination-port-range 8080 \
+  --access allow
+
+# Get public IP address
 IP_ADDRESS=$(az vm show \
   --resource-group $RESOURCE_GROUP \
   --name $VM_NAME \
@@ -61,8 +55,4 @@ IP_ADDRESS=$(az vm show \
   --query [publicIps] \
   --output tsv)
 
-# Open a SSH session to the VM
-ssh azureuser@$IP_ADDRESS
-
-# Delete a resource group
-# az group delete --name $RESOURCE_GROUP --yes --no-wait
+curl --connect-timeout 5 http://$IP_ADDRESS:8080
