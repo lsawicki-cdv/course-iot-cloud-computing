@@ -30,15 +30,6 @@ az vmss extension set \
   --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/2-iaas/vm.sh"]}' \
   --protected-settings '{"commandToExecute": "./vm.sh"}'
 
-# Get public IP address of the azure load balancer
-IP_ADDRESS=$(az network public-ip show \
-  --resource-group $RESOURCE_GROUP \
-  --name ${SCALE_SET_NAME}LBPublicIP \
-  --query [ipAddress] \
-  --output tsv)
-
-curl --connect-timeout 5 http://$IP_ADDRESS
-
 # List network security group rules
 az network nsg rule list \
   --resource-group $RESOURCE_GROUP \
@@ -54,6 +45,13 @@ az network nsg rule create \
   --priority 1020 \
   --destination-port-range 80 \
   --access allow
+
+# Get public IP address of the azure load balancer
+IP_ADDRESS=$(az network public-ip show \
+  --resource-group $RESOURCE_GROUP \
+  --name ${SCALE_SET_NAME}LBPublicIP \
+  --query [ipAddress] \
+  --output tsv)
 
 curl --connect-timeout 5 http://$IP_ADDRESS
 
