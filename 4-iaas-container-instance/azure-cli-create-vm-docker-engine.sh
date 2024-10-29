@@ -47,6 +47,9 @@ az network nsg rule create \
   --destination-port-range 8080 \
   --access allow
 
+# Access the VM
+az ssh vm --resource-group $RESOURCE_GROUP --name $VM_NAME
+
 # Get public IP address
 IP_ADDRESS=$(az vm show \
   --resource-group $RESOURCE_GROUP \

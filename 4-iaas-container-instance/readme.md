@@ -1,7 +1,7 @@
 ### Azure Container Instance
 
 1. Follow command from `azure-cli-create-vm-docker-engine.sh` in the Azure Cloud Shell
-2. Go to the Azure Portal to the created Virtual Machine and access instance using "SSH using Azure CLI" 
+2. Access the Virtual Machine via SSH using the Azure CLI command from the `azure-cli-create-vm-docker-engine.sh`
 3. Type in the SSH `nano Dockerfile` and copy content from the `Dockerfile` to the terminal and save it on the virtual machine
 4. Type in the SSH `nano index.html` and copy content from the `index.html` to the terminal and save it on the virtual machine
 5. Follow commands from `docker-cli.sh` in the SSH terminal in the Azure VM
