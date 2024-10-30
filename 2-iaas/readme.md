@@ -70,10 +70,14 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
    ```
    6. Create network security group rule for the virtual machine using the terminal environmental variables to open the http port (80)
    ```bash
-      az network nsg rule list \
+      az network nsg rule create \
          --resource-group $RESOURCE_GROUP \
          --nsg-name ${VM_NAME}NSG \
-         --output table  
+         --name allow-http \
+         --protocol tcp \
+         --priority 1020 \
+         --destination-port-range 80 \
+         --access allow
    ```
    7. Get the public IP address of the virtual machine and save it to the terminal environmental variable `IP_ADDRESS`
    ```bash
