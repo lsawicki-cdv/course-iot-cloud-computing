@@ -55,8 +55,5 @@ IP_ADDRESS=$(az vm show \
 
 curl --connect-timeout 5 http://$IP_ADDRESS
 
-# Open a SSH session to the VM
-# ssh azureuser@$IP_ADDRESS
-
 # Delete a resource group
 # az group delete --name $RESOURCE_GROUP --yes --no-wait
