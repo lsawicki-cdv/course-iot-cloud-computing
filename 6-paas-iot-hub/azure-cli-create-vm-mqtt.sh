@@ -32,7 +32,7 @@ az vm extension set \
 az network nsg rule create \
   --resource-group $RESOURCE_GROUP \
   --nsg-name ${VM_NAME}NSG \
-  --name allow-http \
+  --name allow-mqtt \
   --protocol tcp \
   --priority 1020 \
   --destination-port-range 1883 \

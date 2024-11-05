@@ -60,12 +60,12 @@ pipenv run python simple_mqtt_device_simulator.py
          --version 1.0 \
          --settings '{"docker": {"port": "2375"}}'
    ```
-   5. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container 
+   5. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 1883 port that will be used later by the MQTT broker in a Docker container 
    ```bash
       az network nsg rule create \
          --resource-group $RESOURCE_GROUP \
          --nsg-name ${VM_NAME}NSG \
-         --name allow-http \
+         --name allow-mqtt \
          --protocol tcp \
          --priority 1020 \
          --destination-port-range 1883 \
@@ -79,16 +79,16 @@ pipenv run python simple_mqtt_device_simulator.py
    ```
    2. Copy the following content to the terminal and save it on the virtual machine
    ```
-        version: "3.8"
+    version: "3.8"
 
-        services:
-        mqtt-broker:
-            image: eclipse-mosquitto:latest
-            container_name: mqtt-broker
-            ports:
-            - "1883:1883"
-            volumes:
-            - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    services:
+    mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt-broker
+    ports:
+        - "1883:1883"
+    volumes:
+    - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
    ```
    3. Create HTML file
    ```bash
@@ -99,16 +99,9 @@ pipenv run python simple_mqtt_device_simulator.py
         allow_anonymous true
         listener 1883
    ```
-   5. Add Docker to sudo group
+   5. Run the the following command to start the MQTT broker
    ```bash
-      sudo groupadd docker
-      sudo usermod -aG docker $USER
-      sudo reboot
-   ```
-   6. Connect once again via SSH after the VM rebooted
-   7. Run the the following command to start the MQTT broker
-   ```bash
-      docker-compose up
+      docker compose up
    ```
 11. Test Python MQTT client `simple_mqtt_device_simulator.py`
 12. Follow commands from `azure-cli-create-iot-hub.sh` in the Azure Cloud Shell
