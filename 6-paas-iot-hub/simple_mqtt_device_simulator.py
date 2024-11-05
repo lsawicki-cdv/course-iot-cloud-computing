@@ -54,8 +54,13 @@ def simulate_device():
     # client.tls_insecure_set(False)
 
     print("Connecting MQTT broker")
-    client.connect("localhost", port=1883)
+    client.connect("test.mosquitto.org", port=1883)
+
     print("Connected to MQTT broker")
+
+    topic = "devices/" + device_id + "/messages/events/"
+    print(topic)
+
     while True:
         # Generate random sensor data
         temperature = random.uniform(20, 30)
@@ -63,13 +68,13 @@ def simulate_device():
         pressure = random.uniform(900, 1100)
 
         # Send data to IoT hub
-        send_data_to_iot_hub(client, temperature, humidity, pressure)
+        send_data_to_iot_hub(client, temperature, humidity, pressure, topic)
 
         # Wait for some time before sending the next data
         time.sleep(10)
 
 
-def send_data_to_iot_hub(device_client, temperature, humidity, pressure):
+def send_data_to_iot_hub(device_client, temperature, humidity, pressure, topic):
     payload = {
         "device_id": 15,
         "temperature": temperature,
@@ -78,8 +83,7 @@ def send_data_to_iot_hub(device_client, temperature, humidity, pressure):
         "timestamp": time.time()
     }
     message = json.dumps(payload)
-    device_client.publish("devices/" + device_id +
-                          "/messages/events/", message, qos=1)
+    device_client.publish(topic, message, qos=1)
     print(f"Message sent: {message}")
 
 
