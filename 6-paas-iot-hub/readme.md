@@ -21,7 +21,7 @@ pipenv run python simple_mqtt_device_simulator.py
 
 ## Exercise
 1. Be sure that you have installed Python, Pip and VS Code
-2. Install globally via pip: `pip3 install pipenv==2023.8.281`
+2. Install globally via pip: `pip3 install pipenv==2023.8.28`
 3. Clone the repository to your computer
 4. Go to this directory in the terminal in VS Code (`6-paas-iot-hub`)
 5. Install Python dependencies: `pipenv install`
