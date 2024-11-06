@@ -59,7 +59,7 @@ def simulate_device():
     print("Connected to MQTT broker")
 
     topic = "devices/" + device_id + "/messages/events/"
-    print(topic)
+    print(f"MQTT topic: {topic}")
 
     while True:
         # Generate random sensor data
