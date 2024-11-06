@@ -97,7 +97,7 @@ Python 3.10.12
     ```bash
       docker compose up
     ```
-12. Test Python MQTT client `simple_mqtt_device_simulator.py` with the MQTT broker on the Virtual Machine
+12. Change the MQTT device simulator `simple_mqtt_device_simulator.py` so it connects to the MQTT broker on the Virtual Machine (paste the public IP address)
 13. Issue the following commands in **the Azure Cloud Shell** to create Azure IoT Hub
    1. Set the terminal environmental variables 
    ```bash
@@ -108,7 +108,7 @@ Python 3.10.12
    ```
    2. Create a resource group using the terminal environmental variables
    ```bash
-   az group create --name $RESOURCE_GROUP --location $LOCATION
+      az group create --name $RESOURCE_GROUP --location $LOCATION
    ```
    3. Create the Azure IoT Hub using the terminal environmental variables
    ```bash
@@ -122,7 +122,12 @@ Python 3.10.12
    ```bash
       az iot hub generate-sas-token --hub-name $IOT_HUB_NAME --device-id $IOT_DEVICE_NAME --output table
    ```
-14. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub
+14. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub. Uncomment part of the code and update the following lines
+    ```Python
+      device_id = "<device-id>"
+      sas_token = "<device-sas-token>"
+      iot_hub_name = "<iot-hub-name>"
+    ```
 15. Install the Azure IoT Hub extensions in VS Code
 16. Start monitoring endpoint from your Azure IoT Hub using the mentioned extension in VS Code
 17. Delete resource group
