@@ -205,11 +205,11 @@ def run_sample():
         delete_item(container, 'SalesOrder1', 'Account1')
 
         # cleanup database after sample
-        try:
-            client.delete_database(db)
+        # try:
+        #     client.delete_database(db)
 
-        except exceptions.CosmosResourceNotFoundError:
-            pass
+        # except exceptions.CosmosResourceNotFoundError:
+        #     pass
 
     except exceptions.CosmosHttpResponseError as e:
         print('\nrun_sample has caught an error. {0}'.format(e.message))
