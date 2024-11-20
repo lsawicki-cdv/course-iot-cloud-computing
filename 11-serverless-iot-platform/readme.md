@@ -8,7 +8,7 @@
    - Azure Cosmos DB
    - Azure Stream Analytics
    - Azure Iot Hub
-### The REST API deployed using the Azure Functions should have the following endpoints:
+### The REST API deployed using the Azure Functions should have the following endpoints. Please use [Postman](https://postman.com/) for testing
 
 #### 1. Devices
 
