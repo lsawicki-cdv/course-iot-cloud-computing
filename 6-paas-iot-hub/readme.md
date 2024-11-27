@@ -122,12 +122,27 @@ Python 3.10.12
    ```bash
       az iot hub generate-sas-token --hub-name $IOT_HUB_NAME --device-id $IOT_DEVICE_NAME --output table
    ```
-14. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub. Uncomment part of the code and update the following lines
+14. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub. Update the following lines
     ```Python
       device_id = "<device-id>"
       sas_token = "<device-sas-token>"
       iot_hub_name = "<iot-hub-name>"
     ```
-15. Install the Azure IoT Hub extensions in VS Code
-16. Start monitoring endpoint from your Azure IoT Hub using the mentioned extension in VS Code
-17. Delete resource group
+15. Uncomment the following lines
+    ```Python
+    print(iot_hub_name+".azure-devices.net/" +
+          device_id + "/?api-version=2021-04-12")
+    client.username_pw_set(username=iot_hub_name+".azure-devices.net/" +
+                           device_id + "/?api-version=2021-04-12", password=sas_token)
+
+    client.tls_set(ca_certs=path_to_root_cert, certfile=None, keyfile=None,
+                   cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
+    client.tls_insecure_set(False)
+    ```
+16. Change the hub URL and port to `8883` (a standard one for MQTTS communication)
+    ```Python
+    client.connect("<URL>", port=8883)
+    ```
+17. Install the Azure IoT Hub extensions in VS Code
+18. Start monitoring endpoint from your Azure IoT Hub using the mentioned extension in VS Code
+19. Delete resource group

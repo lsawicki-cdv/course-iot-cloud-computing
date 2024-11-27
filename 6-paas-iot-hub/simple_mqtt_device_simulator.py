@@ -76,7 +76,7 @@ def simulate_device():
 
 def send_data_to_iot_hub(device_client, temperature, humidity, pressure, topic):
     payload = {
-        "device_id": 15,
+        "device_id": device_id,
         "temperature": temperature,
         "humidity": humidity,
         "pressure": pressure,

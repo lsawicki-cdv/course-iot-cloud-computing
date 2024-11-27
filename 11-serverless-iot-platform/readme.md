@@ -4,7 +4,6 @@
 
 ### Please create the following Azure Services using the instructions placed in this directory `11-serverless-iot-platform`
    - Azure Functions
-   - Azure API Managment
    - Azure Cosmos DB
    - Azure Stream Analytics
    - Azure Iot Hub
