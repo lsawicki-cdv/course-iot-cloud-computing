@@ -139,7 +139,7 @@
 
       REGISTRY_PASSWORD=$(az acr credential show --name $ACI_NAME --query passwords[0].value --output tsv)
       
-      az container create --resource-group $RESOURCE_GROUP --name $ACI_NAME --image $ACI_NAME.azurecr.io/$ACI_IMAGE --cpu 1 --memory 1 --registry-login-server $ACI_NAME.azurecr.io --registry-username $REGISTRY_USERNAME --registry-password $REGISTRY_PASSWORD --dns-name-label $ACI_NAME --ports 80
+      az container create --resource-group $RESOURCE_GROUP --name $ACI_NAME --image $ACI_NAME.azurecr.io/$ACI_IMAGE --cpu 1 --memory 1 --registry-login-server $ACI_NAME.azurecr.io --registry-username $REGISTRY_USERNAME --registry-password $REGISTRY_PASSWORD --dns-name-label $ACI_NAME --ports 80 --os-type Linux
    ```
 6. Check in the web browser or using `curl` that the HTTP traffic goes to the Docker Container in the Azure Container instances on port 80
 7.  Delete resource groups
