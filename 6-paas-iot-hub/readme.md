@@ -19,23 +19,27 @@ Python 3.10.12
       .venv\scripts\activate
    ```
 6. Install dependencies: `pip install -r requirements.txt`
-7. Run Python device simulator `python simple_mqtt_device_simulator.py`. It will connect by default to the [Mosquitto Test Server](https://test.mosquitto.org/)
-8. Go to [MQTT test client](https://testclient-cloud.mqtt.cool/), connect the [Mosquitto Test Server](https://test.mosquitto.org/) and subscribe (so you can receive messages) to the MQTT topic mentioned in the `simple_mqtt_device_simulator.py` (it should be visible in logs in the terminal)
-9. Issue the following commands in **the Azure Cloud Shell**
-   1. Set the terminal environmental variables 
-   ```bash
+7. Change the Python MQTT client `simple_mqtt_device_simulator.py`. Change the `device_id` value to something unique
+    ```Python
+      device_id = "<device-id>"
+    ```
+8. Run Python device simulator `python simple_mqtt_device_simulator.py`. It will connect by default to the [Mosquitto Test Server](https://test.mosquitto.org/)
+9. Go to [MQTT test client](https://testclient-cloud.mqtt.cool/), connect the [Mosquitto Test Server](https://test.mosquitto.org/) and subscribe (so you can receive messages) to the MQTT topic mentioned in the `simple_mqtt_device_simulator.py` (it should be visible in logs in the terminal)
+10. Issue the following commands in **the Azure Cloud Shell**
+    1.  Set the terminal environmental variables 
+    ```bash
       RESOURCE_GROUP="myResourceGroupVMForDocker"
       LOCATION="uksouth"
       VM_NAME="my-vm-mqtt-docker"
       IMAGE="Ubuntu2204"
       SIZE="Standard_B1s"
-   ```
-   2. Create a resource group using the terminal environmental variables
-   ```bash
-   az group create --name $RESOURCE_GROUP --location $LOCATION
-   ```
-   3. Create a virtual machine using the terminal environmental variables
-   ```bash
+    ```
+    2. Create a resource group using the terminal environmental variables
+    ```bash
+    az group create --name $RESOURCE_GROUP --location $LOCATION
+    ```
+    3. Create a virtual machine using the terminal environmental variables
+    ```bash
       az vm create \
          --resource-group $RESOURCE_GROUP \
          --name $VM_NAME \
@@ -43,9 +47,9 @@ Python 3.10.12
          --size $SIZE \
          --admin-username azureuser \
          --generate-ssh-keys
-   ```
-   4. Install the docker engine on the virtual machine set using the terminal environmental variables
-   ```bash
+    ```
+    4. Install the docker engine on the virtual machine set using the terminal environmental variables
+    ```bash
       az vm extension set \
          --resource-group $RESOURCE_GROUP \
          --vm-name $VM_NAME \
@@ -53,9 +57,9 @@ Python 3.10.12
          --publisher Microsoft.Azure.Extensions \
          --version 1.0 \
          --settings '{"docker": {"port": "2375"}}'
-   ```
-   5. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 1883 port that will be used later by the MQTT broker in a Docker container 
-   ```bash
+    ```
+    5. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 1883 port that will be used later by the MQTT broker in a Docker container 
+    ```bash
       az network nsg rule create \
          --resource-group $RESOURCE_GROUP \
          --nsg-name ${VM_NAME}NSG \
@@ -64,9 +68,9 @@ Python 3.10.12
          --priority 1020 \
          --destination-port-range 1883 \
          --access allow
-   ```
-10. Access the Virtual machine using "SSH using Azure CLI" on the Azure portal
-11. In the SSH of the Virtual Machine issue the following commands:
+    ```
+11. Access the Virtual machine using "SSH using Azure CLI" on the Azure portal
+12. In the SSH of the Virtual Machine issue the following commands:
     1.  Create Docker compose file 
     ```bash
       nano docker-compose.yml
@@ -84,51 +88,58 @@ Python 3.10.12
          volumes:
             - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     ```
-    1. Create HTML file
+    3. Create a mosquitto configuration file
     ```bash
       nano mosquitto.conf
     ```
-    2. Copy the following content to the terminal and save it on the virtual machine
+    4. Copy the following content to the terminal and save it on the virtual machine
     ```
       allow_anonymous true
       listener 1883
     ```
-    3. Run the the following command to start the MQTT broker
+    5. Add Docker to sudo group
+      ```bash
+         sudo groupadd docker
+         sudo usermod -aG docker $USER
+         sudo reboot
+      ```
+    6. Connect once again via SSH after the VM rebooted
+    7. Run the the following command to start the MQTT broker
     ```bash
       docker compose up
     ```
-12. Change the MQTT device simulator `simple_mqtt_device_simulator.py` so it connects to the MQTT broker on the Virtual Machine (paste the public IP address)
-13. Issue the following commands in **the Azure Cloud Shell** to create Azure IoT Hub
-   1. Set the terminal environmental variables 
-   ```bash
+13. Change the MQTT device simulator `simple_mqtt_device_simulator.py` so it connects to the MQTT broker on the Virtual Machine (paste the public IP address)
+14. Issue the following commands in **the Azure Cloud Shell** to create Azure IoT Hub
+    1.  Set the terminal environmental variables 
+    ```bash
     RESOURCE_GROUP="myIotHubResourceGroup"
     LOCATION="uksouth"
     IOT_HUB_NAME="my-super-iot-hub"
     IOT_DEVICE_NAME="my-new-device"
-   ```
-   2. Create a resource group using the terminal environmental variables
-   ```bash
+    ```
+    2. Create a resource group using the terminal environmental variables
+    ```bash
       az group create --name $RESOURCE_GROUP --location $LOCATION
-   ```
-   3. Create the Azure IoT Hub using the terminal environmental variables
-   ```bash
+    ```
+    3. Create the Azure IoT Hub using the terminal environmental variables
+    ```bash
       az iot hub create --resource-group $RESOURCE_GROUP --name $IOT_HUB_NAME --location $LOCATION --sku F1 --partition-count 2
-   ```
-   4. Create the device identity on Azure IoT Hub
-   ```bash
+    ```
+    4. Create the device identity on Azure IoT Hub
+    ```bash
       az iot hub device-identity create --hub-name $IOT_HUB_NAME --device-id $IOT_DEVICE_NAME
-   ```
-   5. Get SAS token for the IoT Hub
-   ```bash
+    ```
+    5. Get SAS token for the IoT Hub
+    ```bash
       az iot hub generate-sas-token --hub-name $IOT_HUB_NAME --device-id $IOT_DEVICE_NAME --output table
-   ```
-14. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub. Update the following lines
+    ```
+15. Change the Python MQTT client `simple_mqtt_device_simulator.py` to connect to Azure IoT Hub. Update the following lines
     ```Python
       device_id = "<device-id>"
       sas_token = "<device-sas-token>"
       iot_hub_name = "<iot-hub-name>"
     ```
-15. Uncomment the following lines
+16. Uncomment the following lines
     ```Python
     print(iot_hub_name+".azure-devices.net/" +
           device_id + "/?api-version=2021-04-12")
@@ -139,10 +150,10 @@ Python 3.10.12
                    cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2, ciphers=None)
     client.tls_insecure_set(False)
     ```
-16. Change the hub URL and port to `8883` (a standard one for MQTTS communication)
+17. Change the hub URL and port to `8883` (a standard one for MQTTS communication)
     ```Python
     client.connect("<URL>", port=8883)
     ```
-17. Install the Azure IoT Hub extensions in VS Code
-18. Start monitoring endpoint from your Azure IoT Hub using the mentioned extension in VS Code
-19. Delete resource group
+18. Install the Azure IoT Hub extensions in VS Code
+19. Start monitoring endpoint from your Azure IoT Hub using the mentioned extension in VS Code
+20. Delete resource group
