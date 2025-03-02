@@ -247,6 +247,7 @@ terraform apply main.tfplan
 11. When finished, clean up all resources to avoid unnecessary costs
 ```bash
 terraform plan -destroy -out main.destroy.tfplan
+terraform apply main.destroy.tfplan
 ```
 ### Important Notes
 
