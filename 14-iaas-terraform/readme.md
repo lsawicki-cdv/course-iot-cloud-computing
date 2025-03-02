@@ -242,11 +242,11 @@ terraform apply main.tfplan
 8. Verify on Azure if the resources where created properly.
 9. Adjust the terraform files so:
    1. The Network security group has the port 80 (HTTP) open
-   2. Install Bash script dependencies: https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/2-iaas/vm.sh during deployment
+   2. the Bash script from: https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/2-iaas/vm.sh is installed during deployment
 10. Verify the web server is running by accessing the VM's public IP address in a web browser
 11. When finished, clean up all resources to avoid unnecessary costs
 ```bash
-terraform destroy
+terraform plan -destroy -out main.destroy.tfplan
 ```
 ### Important Notes
 
