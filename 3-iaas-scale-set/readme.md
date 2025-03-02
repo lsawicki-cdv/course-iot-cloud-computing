@@ -1,7 +1,7 @@
 ### Azure Virtual Machine Scale Set task
 
-1. Open the Azure Cloud Shell
-2. Issue the following commands in **the Azure Cloud Shell**
+1. Open the Azure Cloud Shell (Bash)
+2. Issue the following commands in **the Azure Cloud Shell (Bash)**
    1. Set the terminal environmental variables 
    ```bash
       RESOURCE_GROUP="myResourceGroupScaleSet2"

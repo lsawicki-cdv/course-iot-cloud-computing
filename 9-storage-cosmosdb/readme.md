@@ -25,7 +25,7 @@ Change the Azure Cosmos DB endpoint URL and the key in the `config.py` file.
       .venv\scripts\activate
    ```
 6. Install dependencies: `pip install -r requirements.txt`
-7. Issue the following commands in **the Azure Cloud Shell**
+7. Issue the following commands in **the Azure Cloud Shell (Bash)**
    1. Set the terminal environmental variables 
    ```bash
       RESOURCE_GROUP="myResourceGroupCosmosDb"

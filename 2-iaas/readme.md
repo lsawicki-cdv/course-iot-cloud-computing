@@ -28,7 +28,7 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
 6. Add inbound security rule and allow HTTP traffic (port 80) in the Network settings
 7. Try again to access the VM using its public IP address via the Browser (you should have access)
 8. Delete the resource
-9. Issue the following commands in **the Azure Cloud Shell**
+9. Issue the following commands in **the Azure Cloud Shell (Bash)**
    1. Set the terminal environmental variables 
    ```bash
    RESOURCE_GROUP="myResourceGroupVM"
