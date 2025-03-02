@@ -229,15 +229,15 @@ This exercise will guide you through creating an Azure Virtual Machine using Ter
     ```
 5. Initialize the Terraform working directory
 ```bash
-terraform init
+terraform init -upgrade
 ```
 6. Review the Terraform plan to see what resources will be created
 ```bash
-terraform plan
+terraform plan -out main.tfplan
 ```
 7. Apply the Terraform configuration to create the resources
 ```bash
-terraform apply
+terraform apply main.tfplan
 ```
 8. Verify on Azure if the resources where created properly.
 9. Adjust the terraform files so:
