@@ -17,7 +17,7 @@ This exercise will guide you through creating an Azure Virtual Machine using Ter
     mkdir terraform-vm
     cd terraform-vm
 ```
-4. Create the following Terraform configuration files using the cat command:
+4. Clone the repository (https://github.com/lsawicki-cdv/course-iot-cloud-computing.git) to the `terraform-vm` directory **or** create the following Terraform configuration files using the nano command:
    1. Create providers.tf using `nano providers.tf` and copy following content:
     ```bash
     terraform {
