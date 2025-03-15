@@ -4,8 +4,8 @@
 Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the SQL API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use Azure Cosmos DB with the SQL API to store and access data from a Node.js application.
 
 ## Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 24.04
+Python 3.12.3
 
 ## Change your Azure CosmosDB credentials
 Change the Azure Cosmos DB endpoint URL and the key in the `config.py` file.
