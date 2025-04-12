@@ -14,6 +14,10 @@ This course provides an in-depth understanding of IoT and Cloud Computing using 
 - Basic knowledge of programming (Python).
 - Familiarity with cloud computing concepts.
 
+## Remote development over SSH using Visual Studio Code
+
+In case of issues with setting up your own PC (or a school's PC) try development on a Virtual Machine using the following tutorial: https://code.visualstudio.com/docs/remote/ssh-tutorial
+
 ## Resources
 - [Azure For Students](https://azure.microsoft.com/en-us/free/students)
 - [Azure Documentation](https://docs.microsoft.com/en-us/azure/)
