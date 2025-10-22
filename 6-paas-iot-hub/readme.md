@@ -21,7 +21,7 @@ Python 3.10.12
 6. Install dependencies: `pip install -r requirements.txt`
 7. Change the Python MQTT client `simple_mqtt_device_simulator.py`. Change the `device_id` value to something unique
     ```Python
-      device_id = "<device-id>"
+      device_id = "some_unique_name_to_figure_out_on_your_own_dont_copy"
     ```
 8. Run Python device simulator `python simple_mqtt_device_simulator.py`. It will connect by default to the [Mosquitto Test Server](https://test.mosquitto.org/)
 9. Go to [MQTT test client](https://testclient-cloud.mqtt.cool/), connect the [Mosquitto Test Server](https://test.mosquitto.org/) and subscribe (so you can receive messages) to the MQTT topic mentioned in the `simple_mqtt_device_simulator.py` (it should be visible in logs in the terminal)
