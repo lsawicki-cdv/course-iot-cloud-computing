@@ -1,0 +1,25 @@
+# Certificate and key files - DO NOT COMMIT!
+*.pem
+*.pfx
+*.p12
+*.key
+*.crt
+*.cer
+
+# Thumbprint file
+thumbprint.txt
+
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
