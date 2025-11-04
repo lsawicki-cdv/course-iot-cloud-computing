@@ -2,9 +2,10 @@
 
 FUNCTION_APP_NAME="cdv-iot-platform-functions"
 
-sudo apt-get install azure-functions-core-tools-4
+# To install on Linux machines. For Windows download an installer file
+# sudo apt-get install azure-functions-core-tools-4
 
-cd 11-serverless-iot-platform/iot-function-app
+cd iot-function-app
 
 python -m venv .venv
 source .venv/bin/activate
@@ -13,11 +14,12 @@ pip install -r requirements.txt
 
 func init --python
 
-func new --name device --template "HTTP trigger" --authlevel "function"
+# To create functions from scratch based on the HTTP trigger template
+# func new --name device --template "HTTP trigger" --authlevel "function"
 
-func new --name house --template "HTTP trigger" --authlevel "function"
+# func new --name house --template "HTTP trigger" --authlevel "function"
 
-func new --name rooms --template "HTTP trigger" --authlevel "function"
+# func new --name rooms --template "HTTP trigger" --authlevel "function"
 
 # For local testing
 func start 
