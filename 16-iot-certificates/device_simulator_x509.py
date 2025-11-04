@@ -26,7 +26,8 @@ import json
 # CONFIGURATION - Update these values for your IoT Hub
 # =============================================================================
 
-IOTHUB_HOSTNAME = "your-hub-name.azure-devices.net"  # e.g., "my-iot-hub.azure-devices.net"
+# e.g., "my-iot-hub.azure-devices.net"
+IOTHUB_HOSTNAME = "your-hub-name.azure-devices.net"
 DEVICE_ID = "device-x509-test"  # Must match the device ID in IoT Hub
 
 CERTIFICATE_FILE = "device-cert.pem"  # Public certificate
@@ -42,7 +43,8 @@ def check_configuration():
     errors = []
 
     if IOTHUB_HOSTNAME == "your-hub-name.azure-devices.net":
-        errors.append("⚠ Please update IOTHUB_HOSTNAME with your actual IoT Hub hostname")
+        errors.append(
+            "⚠ Please update IOTHUB_HOSTNAME with your actual IoT Hub hostname")
 
     if DEVICE_ID == "device-x509-test":
         print("⚠ Using default DEVICE_ID. Update if you used a different device ID.")
@@ -134,7 +136,8 @@ async def send_telemetry(client, message_count=10, interval_seconds=5):
         message_count: Number of messages to send
         interval_seconds: Delay between messages
     """
-    print(f"Sending {message_count} messages (one every {interval_seconds} seconds)...")
+    print(
+        f"Sending {message_count} messages (one every {interval_seconds} seconds)...")
     print()
 
     for i in range(message_count):

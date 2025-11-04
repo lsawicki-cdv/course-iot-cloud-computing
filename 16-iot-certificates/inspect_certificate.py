@@ -201,7 +201,7 @@ def main():
 
     # Save thumbprint to file for easy reference
     sha1_fingerprint = certificate.fingerprint(hashes.SHA1())
-    thumbprint = sha1_fingerprint.hex('').upper()  # No colons, uppercase
+    thumbprint = sha1_fingerprint.hex().upper()  # No colons, uppercase
 
     with open("thumbprint.txt", "w") as f:
         f.write(thumbprint)

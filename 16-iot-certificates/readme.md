@@ -112,7 +112,7 @@ This script shows you:
    - **Device ID**: `device-x509-test` (or any name)
    - **Authentication type**: Select **X.509 Self-Signed**
    - **Primary Thumbprint**: Copy from the output of `inspect_certificate.py` (the SHA-1 fingerprint)
-   - **Secondary Thumbprint**: Leave empty (optional backup)
+   - **Secondary Thumbprint**: Copy from the output of `inspect_certificate.py` (the SHA-1 fingerprint)
 4. Click **Save**
 
 #### 6. Configure and Run the Device Simulator
