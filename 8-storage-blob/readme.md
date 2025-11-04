@@ -1,10 +1,14 @@
 ## Azure Blob Storage
 
 1. Issue the following commands in **the Azure Cloud Shell (Bash)**
-   1. Set the terminal environmental variables 
+   1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP_NAME="myResourceGroupFrontend"
+   ```
+   ```bash
       STORAGE_ACCOUNT_NAME="mystorageaccountfrontend"
+   ```
+   ```bash
       LOCATION="uksouth"
    ```
    2. Create a resource group using the terminal environmental variables

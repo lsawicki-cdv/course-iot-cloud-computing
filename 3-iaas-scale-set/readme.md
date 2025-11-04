@@ -2,12 +2,20 @@
 
 1. Open the Azure Cloud Shell (Bash)
 2. Issue the following commands in **the Azure Cloud Shell (Bash)**
-   1. Set the terminal environmental variables 
+   1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP="myResourceGroupScaleSet2"
+   ```
+   ```bash
       LOCATION="uksouth"
+   ```
+   ```bash
       SCALE_SET_NAME="myScaleSet2"
+   ```
+   ```bash
       IMAGE="Ubuntu2204"
+   ```
+   ```bash
       SIZE="Standard_B1s"
    ```
    2. Create a resource group using the terminal environmental variables

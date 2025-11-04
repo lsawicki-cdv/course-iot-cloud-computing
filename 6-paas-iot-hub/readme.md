@@ -26,12 +26,20 @@ Python 3.10.12
 8. Run Python device simulator `python simple_mqtt_device_simulator.py`. It will connect by default to the [Mosquitto Test Server](https://test.mosquitto.org/)
 9. Go to [MQTT test client](https://testclient-cloud.mqtt.cool/), connect the [Mosquitto Test Server](https://test.mosquitto.org/) and subscribe (so you can receive messages) to the MQTT topic mentioned in the `simple_mqtt_device_simulator.py` (it should be visible in logs in the terminal)
 10. Issue the following commands in **the Azure Cloud Shell (Bash)**
-    1.  Set the terminal environmental variables 
+    1.  Set the terminal environmental variables
     ```bash
       RESOURCE_GROUP="myResourceGroupVMForDocker"
+    ```
+    ```bash
       LOCATION="uksouth"
+    ```
+    ```bash
       VM_NAME="my-vm-mqtt-docker"
+    ```
+    ```bash
       IMAGE="Ubuntu2204"
+    ```
+    ```bash
       SIZE="Standard_B1s"
     ```
     2. Create a resource group using the terminal environmental variables
@@ -110,11 +118,17 @@ Python 3.10.12
     ```
 13. Change the MQTT device simulator `simple_mqtt_device_simulator.py` so it connects to the MQTT broker on the Virtual Machine (paste the public IP address)
 14. Issue the following commands in **the Azure Cloud Shell (Bash)** to create Azure IoT Hub
-    1.  Set the terminal environmental variables 
+    1.  Set the terminal environmental variables
     ```bash
     RESOURCE_GROUP="myIotHubResourceGroup"
+    ```
+    ```bash
     LOCATION="uksouth"
+    ```
+    ```bash
     IOT_HUB_NAME="my-super-iot-hub"
+    ```
+    ```bash
     IOT_DEVICE_NAME="my-new-device"
     ```
     2. Create a resource group using the terminal environmental variables

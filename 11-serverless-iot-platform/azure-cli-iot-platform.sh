@@ -9,7 +9,6 @@ COSMOS_DB_ACCOUNT_NAME="cosmos-db-account-iot-platform"
 COSMOS_DB_DATABASE_NAME="iot-platform-database"
 FUNCTION_APP_NAME="cdv-iot-platform-functions"
 STORAGE_ACCOUNT_NAME="cdviotplatformfunctions"
-API_MANAGEMENT_NAME="cdv-iot-platform-api"
 IOT_DEVICE_NAME="my-new-device-1"
 
 # Create a resource group
@@ -51,7 +50,7 @@ az stream-analytics input create --resource-group $RESOURCE_GROUP \
                                 \"serialization\":{\"type\":\"Json\",\"properties\":{\"encoding\":\"UTF8\"}}}"
 
 # Get the input details
-az stream-analytics input show --input-name $IOT_HUB_NAME --job-name $STREAM_ANALYTICS_JOB_NAME --resource-group $RESOURCE_GROUP
+az stream-analytics input show --input-name cdviotplatformhub --job-name $STREAM_ANALYTICS_JOB_NAME --resource-group $RESOURCE_GROUP
 
 # Get Account Key from Cosmos DB
 az cosmosdb keys list --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --type keys --query "primaryMasterKey"
@@ -70,5 +69,7 @@ az stream-analytics output show --output-name iotplatformdatabase --job-name $ST
 # Create a Storage Account for the Function App
 az storage account create --name $STORAGE_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --sku Standard_LRS
 
+az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --query connectionString --output tsv
+
 # Create a Function App for the IoT Platform API (Python)
-az functionapp create --resource-group $RESOURCE_GROUP --consumption-plan-location $LOCATION --name $FUNCTION_APP_NAME --storage-account $STORAGE_ACCOUNT_NAME --runtime python --functions-version 4 --os-type Linux
+az functionapp create --resource-group $RESOURCE_GROUP --consumption-plan-location $LOCATION --name $FUNCTION_APP_NAME --storage-account $STORAGE_ACCOUNT_NAME --runtime python --functions-version 4 --runtime-version 3.12 --os-type Linux

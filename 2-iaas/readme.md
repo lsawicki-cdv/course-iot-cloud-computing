@@ -29,12 +29,20 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
 7. Try again to access the VM using its public IP address via the Browser (you should have access)
 8. Delete the resource
 9. Issue the following commands in **the Azure Cloud Shell (Bash)**
-   1. Set the terminal environmental variables 
+   1. Set the terminal environmental variables
    ```bash
    RESOURCE_GROUP="myResourceGroupVM"
+   ```
+   ```bash
    LOCATION="uksouth"
+   ```
+   ```bash
    VM_NAME="my-vm"
+   ```
+   ```bash
    IMAGE="Ubuntu2204"
+   ```
+   ```bash
    SIZE="Standard_B1s"
    ```
    2. Create a resource group using the terminal environmental variables

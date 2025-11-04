@@ -1,12 +1,20 @@
 ### Azure Container Instance
 
 1. Issue the following commands in **the Azure Cloud Shell (Bash)**
-   1. Set the terminal environmental variables 
+   1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP="myResourceGroupVMForDocker"
+   ```
+   ```bash
       LOCATION="uksouth"
+   ```
+   ```bash
       VM_NAME="my-vm-mqtt-docker"
+   ```
+   ```bash
       IMAGE="Ubuntu2204"
+   ```
+   ```bash
       SIZE="Standard_B1s"
    ```
    2. Create a resource group using the terminal environmental variables
@@ -102,11 +110,17 @@
    ```
 4. Check in the web browser or using `curl` that the HTTP traffic goes to the Docker Container on Azure Virtual Machine on port 8080
 5. Run the the same Docker Image using Azure Container instance. In **the SSH of the Virtual Machine** issue the following commands
-   1. Set the terminal environmental variables 
+   1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP="container-test"
+   ```
+   ```bash
       ACI_NAME="mycontainertest"
+   ```
+   ```bash
       ACI_IMAGE="my-custom-app:1.0.0"
+   ```
+   ```bash
       LOCATION="eastus"
    ```
    2. Authenticate the Azure CLI
