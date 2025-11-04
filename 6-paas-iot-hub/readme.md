@@ -1,5 +1,7 @@
 ## Azure Iot Hub
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
+
 ## Tested environments
 Ubuntu 22.04
 Python 3.10.12
@@ -31,7 +33,7 @@ Python 3.10.12
       RESOURCE_GROUP="myResourceGroupVMForDocker"
     ```
     ```bash
-      LOCATION="uksouth"
+      LOCATION="uksouth"  # Change to your allowed region if needed
     ```
     ```bash
       VM_NAME="my-vm-mqtt-docker"

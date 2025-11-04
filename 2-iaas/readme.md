@@ -1,8 +1,12 @@
 ### Azure Virtual Machine task
 
+**Important**: Before starting, check your Azure subscription's Policy assignments to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions).
+
+Check your allowed regions here: https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments
+
 1. Create Azure Virtual Machine from Azure Portal: https://portal.azure.com/#create/Microsoft.VirtualMachine-ARM
    1. Create resource group if you don't have any
-   2. Region: UK South
+   2. Region: UK South (or your allowed region based on Policy)
    3. Image: Ubuntu 22.04
    4. Size: B1s (free)
    5. Allow port 22

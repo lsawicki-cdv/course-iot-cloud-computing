@@ -1,5 +1,7 @@
 ## Azure IoT Hub with Terraform
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
+
 ### Tested environments
 Ubuntu 24.04
 Terraform v1.11.0
@@ -43,7 +45,7 @@ This exercise will guide you through creating an Azure Iot Hub with Azure Blob S
 
         variable "location" {
         description = "Azure region"
-        default     = "uksouth"
+        default     = "uksouth"  # Change to your allowed region if needed
         }
 
         variable "iot_hub_name" {

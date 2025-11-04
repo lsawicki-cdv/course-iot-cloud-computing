@@ -1,5 +1,7 @@
 ## JWT Token Authentication in REST API
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. If you plan to deploy this REST API to Azure (e.g., Azure App Service), your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead of UK South if necessary.
+
 ### Learning Objectives
 - Understand JWT (JSON Web Tokens) and how they work
 - Learn about stateless authentication in REST APIs

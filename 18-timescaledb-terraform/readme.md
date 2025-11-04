@@ -1,5 +1,7 @@
 ## TimescaleDB for IoT Time-Series Data with Terraform
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. This exercise deploys an Azure VM, and your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead of the default region if necessary.
+
 ### Learning Objectives
 - Understand time-series databases and why they're important for IoT
 - Learn about TimescaleDB hypertables for efficient time-series storage

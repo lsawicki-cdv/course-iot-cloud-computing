@@ -1,5 +1,7 @@
 ## Azure Blob Storage
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
+
 1. Issue the following commands in **the Azure Cloud Shell (Bash)**
    1. Set the terminal environmental variables
    ```bash
@@ -9,7 +11,7 @@
       STORAGE_ACCOUNT_NAME="mystorageaccountfrontend"
    ```
    ```bash
-      LOCATION="uksouth"
+      LOCATION="uksouth"  # Change to your allowed region if needed
    ```
    2. Create a resource group using the terminal environmental variables
    ```bash

@@ -1,5 +1,7 @@
 ## Azure IoT Hub - X.509 Certificates and TLS
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. If you need to create a new IoT Hub for this exercise, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead of UK South if necessary.
+
 ### Learning Objectives
 - Understand TLS (Transport Layer Security) and how it secures IoT communications
 - Learn about X.509 certificates and the Chain of Trust concept

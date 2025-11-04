@@ -1,5 +1,7 @@
 ## Azure VM with Terraform
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
+
 ### Tested environments
 Ubuntu 22.04
 Terraform v1.11.0
@@ -47,7 +49,7 @@ This exercise will guide you through creating an Azure Virtual Machine using Ter
    ```bash
         variable "resource_group_location" {
         type        = string
-        default     = "uksouth"
+        default     = "uksouth"  # Change to your allowed region if needed
         description = "Location of the resource group."
         }
 

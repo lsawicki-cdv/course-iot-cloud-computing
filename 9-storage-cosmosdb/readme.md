@@ -1,5 +1,7 @@
 # Azure CosmosDB
 
+**Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
+
 ## Developing a Python app using the Azure Cosmos DB SQL API
 Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the SQL API, which provides a JSON document model with SQL querying and JavaScript procedural logic. This sample shows you how to use Azure Cosmos DB with the SQL API to store and access data from a Node.js application.
 
@@ -34,7 +36,7 @@ Change the Azure Cosmos DB endpoint URL and the key in the `config.py` file.
       COSMOS_DB_ACCOUNT="my-cosmos-super-db"
    ```
    ```bash
-      LOCATION="uksouth"
+      LOCATION="uksouth"  # Change to your allowed region if needed
    ```
    2. Create a resource group using the terminal environmental variables
    ```bash
