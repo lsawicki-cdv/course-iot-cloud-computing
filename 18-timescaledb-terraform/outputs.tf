@@ -18,6 +18,11 @@ output "api_url" {
   value       = "http://${azurerm_public_ip.public_ip.ip_address}:5000"
 }
 
+output "pgadmin_url" {
+  description = "pgAdmin web interface URL"
+  value       = "http://${azurerm_public_ip.public_ip.ip_address}:5050"
+}
+
 output "connection_instructions" {
   description = "Instructions for connecting to the VM and services"
   value       = <<-EOT
@@ -41,7 +46,11 @@ output "connection_instructions" {
     http://${azurerm_public_ip.public_ip.ip_address}:5000/api/sensors
     http://${azurerm_public_ip.public_ip.ip_address}:5000/api/sensors/sensor_001/current
 
-  Database Connection:
+  pgAdmin Web Interface:
+    http://${azurerm_public_ip.public_ip.ip_address}:5050
+    Login: admin@admin.com / admin
+
+  Database Connection (CLI):
     docker exec -it timescaledb psql -U postgres -d iotdata
 
   EOT

@@ -149,7 +149,8 @@ docker compose ps
 
 You should see:
 - `timescaledb`: Database container
-- `api`: REST API container (we'll build this)
+- `api`: REST API container
+- `pgadmin`: pgAdmin web interface
 
 #### 4. Initialize the Database
 
@@ -185,7 +186,136 @@ This creates realistic IoT data:
 - Pressure (980-1020 hPa)
 - Timestamps spanning the specified period
 
-#### 6. Understand the Database Schema
+#### 6. Explore the Database with pgAdmin
+
+pgAdmin is a web-based database administration tool for PostgreSQL/TimescaleDB. It provides a graphical interface to explore tables, run queries, and visualize data.
+
+**Access pgAdmin:**
+
+Open your web browser and navigate to:
+```
+http://<VM_PUBLIC_IP>:5050
+```
+
+**Login credentials:**
+- Email: `admin@admin.com`
+- Password: `admin`
+
+**Connect to TimescaleDB:**
+
+1. In pgAdmin, click **"Add New Server"**
+2. In the **General** tab:
+   - Name: `TimescaleDB IoT`
+3. In the **Connection** tab:
+   - Host name/address: `timescaledb` (container name)
+   - Port: `5432`
+   - Maintenance database: `iotdata`
+   - Username: `postgres`
+   - Password: `postgres`
+   - Save password: ✓ (check this box)
+4. Click **Save**
+
+**Explore the Database:**
+
+Once connected, navigate through:
+- **Servers** → **TimescaleDB IoT** → **Databases** → **iotdata** → **Schemas** → **public** → **Tables**
+
+You should see:
+- `sensor_data` (hypertable)
+- `sensor_data_hourly` (materialized view)
+- `sensor_data_daily` (materialized view)
+- `sensor_data_monthly` (materialized view)
+
+**Run Sample Queries:**
+
+Right-click on `iotdata` → **Query Tool** to open the SQL editor. Try these queries:
+
+1. **Count total sensor readings:**
+```sql
+SELECT COUNT(*) as total_readings FROM sensor_data;
+```
+
+2. **View latest readings for all sensors:**
+```sql
+SELECT sensor_id, time, temperature, humidity, pressure
+FROM sensor_data
+ORDER BY time DESC
+LIMIT 10;
+```
+
+3. **Average temperature per sensor (last 24 hours):**
+```sql
+SELECT
+    sensor_id,
+    AVG(temperature) as avg_temp,
+    MIN(temperature) as min_temp,
+    MAX(temperature) as max_temp,
+    COUNT(*) as readings
+FROM sensor_data
+WHERE time > NOW() - INTERVAL '24 hours'
+GROUP BY sensor_id
+ORDER BY sensor_id;
+```
+
+4. **Query hourly aggregates (much faster!):**
+```sql
+SELECT
+    bucket,
+    sensor_id,
+    avg_temperature,
+    min_temperature,
+    max_temperature,
+    reading_count
+FROM sensor_data_hourly
+WHERE bucket > NOW() - INTERVAL '7 days'
+ORDER BY bucket DESC, sensor_id
+LIMIT 20;
+```
+
+5. **View hypertable information:**
+```sql
+SELECT * FROM timescaledb_information.hypertables;
+```
+
+6. **View continuous aggregates:**
+```sql
+SELECT * FROM timescaledb_information.continuous_aggregates;
+```
+
+**Visualize Query Performance:**
+
+Compare execution times between raw queries and continuous aggregates:
+
+- **Slow query** (scans millions of rows):
+```sql
+EXPLAIN ANALYZE
+SELECT
+    time_bucket('1 hour', time) AS hour,
+    AVG(temperature) as avg_temp
+FROM sensor_data
+WHERE time > NOW() - INTERVAL '7 days'
+GROUP BY hour
+ORDER BY hour;
+```
+
+- **Fast query** (uses pre-computed aggregate):
+```sql
+EXPLAIN ANALYZE
+SELECT bucket, avg_temperature
+FROM sensor_data_hourly
+WHERE bucket > NOW() - INTERVAL '7 days'
+ORDER BY bucket;
+```
+
+Notice the difference in execution time and number of rows scanned!
+
+**Tips:**
+- Use **F5** or click the **Execute** button (▶) to run queries
+- Use **Ctrl+Space** for SQL auto-completion
+- Right-click tables to view/edit data, export to CSV, or see table properties
+- The **Dashboard** tab shows real-time database statistics
+
+#### 7. Understand the Database Schema
 
 **Hypertable: `sensor_data`**
 ```sql
@@ -217,7 +347,7 @@ FROM sensor_data
 GROUP BY bucket, sensor_id;
 ```
 
-#### 7. Set Up Cron Jobs for Aggregate Refresh
+#### 8. Set Up Cron Jobs for Aggregate Refresh
 
 Continuous aggregates need to be refreshed to include recent data:
 
@@ -231,7 +361,7 @@ crontab -e
 
 The refresh script updates continuous aggregates with new data.
 
-#### 8. Start the REST API
+#### 9. Start the REST API
 
 The REST API provides efficient endpoints for querying time-series data:
 
@@ -247,7 +377,7 @@ docker compose up -d api
 
 The API will be available at `http://<VM_PUBLIC_IP>:5000`
 
-#### 9. Query Data via REST API
+#### 10. Query Data via REST API
 
 **Available Endpoints:**
 
@@ -287,7 +417,7 @@ Get monthly aggregates for last year:
 curl http://<VM_PUBLIC_IP>:5000/api/sensors/sensor_001/monthly?period=1y
 ```
 
-#### 10. Test with the Client
+#### 11. Test with the Client
 
 From your local machine:
 ```bash
@@ -299,7 +429,7 @@ This demonstrates:
 - Performance comparison (raw vs aggregates)
 - Visualization of query efficiency
 
-#### 11. Understand Query Performance
+#### 12. Understand Query Performance
 
 **Without Continuous Aggregates:**
 - Query millions of rows for averages
@@ -326,7 +456,7 @@ FROM sensor_data_hourly
 WHERE bucket > NOW() - INTERVAL '1 month';
 ```
 
-#### 12. Monitor Database Performance
+#### 13. Monitor Database Performance
 
 Connect to TimescaleDB:
 ```bash

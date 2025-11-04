@@ -7,6 +7,7 @@ Typically run by cron job to keep aggregates up-to-date.
 """
 
 import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
 import sys
 
@@ -66,6 +67,11 @@ def main():
     try:
         # Connect to database
         conn = psycopg2.connect(**DB_CONFIG)
+
+        # Set connection to autocommit mode
+        # This is required because CALL refresh_continuous_aggregate()
+        # cannot run inside a transaction block
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
         # Refresh all continuous aggregates
         # Note: Automated refresh policies handle this, but manual refresh
