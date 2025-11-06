@@ -7,9 +7,11 @@ from paho.mqtt import client as mqtt
 
 # Azure IoT Hub connection details
 path_to_root_cert = "root_cert.pem"
-device_id = "<device-id>"
-sas_token = "<device-sas-token>"
-iot_hub_name = "<iot-hub-name>"
+device_id = "device-id"
+sas_token = "device-sas-token"
+iot_hub_name = "iot-hub-name"
+mqtt_hub_hostname = "test.mosquitto.org"
+mqtt_hub_port = 1883
 
 
 def on_connect(client, userdata, flags, rc):
@@ -54,7 +56,7 @@ def simulate_device():
     # client.tls_insecure_set(False)
 
     print("Connecting MQTT broker")
-    client.connect("test.mosquitto.org", port=1883)
+    client.connect(mqtt_hub_hostname, port=mqtt_hub_port)
 
     print("Connected to MQTT broker")
 
