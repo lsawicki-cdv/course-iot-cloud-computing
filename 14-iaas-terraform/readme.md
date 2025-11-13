@@ -116,6 +116,8 @@ Terraform uses multiple `.tf` files to organize configuration. You'll create 5 f
 nano providers.tf
 ```
 
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code providers.tf` to open the Cloud Shell editor (GUI).
+
 **Copy and paste this content:**
 
 ```hcl
@@ -161,6 +163,8 @@ provider "azurerm" {
 nano variables.tf
 ```
 
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code variables.tf` to open the Cloud Shell editor (GUI).
+
 **Copy and paste this content:**
 
 ```hcl
@@ -197,6 +201,8 @@ variable "username" {
 ```bash
 nano main.tf
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code main.tf` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -351,6 +357,8 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
 nano outputs.tf
 ```
 
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code outputs.tf` to open the Cloud Shell editor (GUI).
+
 **Copy and paste this content:**
 
 ```hcl
@@ -377,6 +385,8 @@ output "public_ip_address" {
 ```bash
 nano ssh.tf
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code ssh.tf` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -520,7 +530,13 @@ resource_group_name = "rg-keen-tortoise"
 
 **Or verify via Azure CLI:**
 
+**Using Bash:**
 ```bash
+az vm list --resource-group $(terraform output -raw resource_group_name) --output table
+```
+
+**Using PowerShell:**
+```powershell
 az vm list --resource-group $(terraform output -raw resource_group_name) --output table
 ```
 
@@ -610,6 +626,8 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
 ```bash
 nano cloud-init.txt
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code cloud-init.txt` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -768,7 +786,13 @@ Wait 2-3 minutes. All resources will be deleted.
 
 **Verify cleanup:**
 
+**Using Bash:**
 ```bash
+az group list --output table | grep rg-
+```
+
+**Using PowerShell:**
+```powershell
 az group list --output table | grep rg-
 ```
 

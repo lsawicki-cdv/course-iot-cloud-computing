@@ -32,7 +32,9 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
 6. Add inbound security rule and allow HTTP traffic (port 80) in the Network settings
 7. Try again to access the VM using its public IP address via the Browser (you should have access)
 8. Delete the resource
-9. Issue the following commands in **the Azure Cloud Shell (Bash)**
+9. Issue the following commands in **the Azure Cloud Shell**
+
+   **Option A: Using Bash (recommended)**
    1. Set the terminal environmental variables
    ```bash
    RESOURCE_GROUP="myResourceGroupVM"
@@ -71,14 +73,14 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
          --name customScript \
          --publisher Microsoft.Azure.Extensions \
          --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/2-iaas/vm.sh"]}' \
-         --protected-settings '{"commandToExecute": "./vm.sh"}'    
+         --protected-settings '{"commandToExecute": "./vm.sh"}'
    ```
    5. List the network security group rules on the virtual machine using the terminal environmental variables
    ```bash
       az network nsg rule list \
          --resource-group $RESOURCE_GROUP \
          --nsg-name ${VM_NAME}NSG \
-         --output table  
+         --output table
    ```
    6. Create network security group rule for the virtual machine using the terminal environmental variables to open the http port (80)
    ```bash
@@ -102,6 +104,79 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
     ```
     8. Check connection to the HTTP server running on the virtual machine
     ```bash
+      curl --connect-timeout 5 http://$IP_ADDRESS
+    ```
+
+   **Option B: Using PowerShell**
+   1. Set the terminal environmental variables (PowerShell syntax)
+   ```powershell
+   $RESOURCE_GROUP="myResourceGroupVM"
+   ```
+   ```powershell
+   $LOCATION="uksouth"
+   ```
+   ```powershell
+   $VM_NAME="my-vm"
+   ```
+   ```powershell
+   $IMAGE="Ubuntu2204"
+   ```
+   ```powershell
+   $SIZE="Standard_B1s"
+   ```
+   2. Create a resource group using the terminal environmental variables
+   ```powershell
+   az group create --name $RESOURCE_GROUP --location $LOCATION
+   ```
+   3. Create a virtual machine using the terminal environmental variables
+   ```powershell
+      az vm create `
+         --resource-group $RESOURCE_GROUP `
+         --name $VM_NAME `
+         --image $IMAGE `
+         --size $SIZE `
+         --admin-username azureuser `
+         --generate-ssh-keys
+   ```
+   4. Install ngnix server on the virtual machine using the terminal environmental variables
+   ```powershell
+      az vm extension set `
+         --resource-group $RESOURCE_GROUP `
+         --vm-name $VM_NAME `
+         --name customScript `
+         --publisher Microsoft.Azure.Extensions `
+         --settings '{\"fileUris\":[\"https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/2-iaas/vm.sh\"]}' `
+         --protected-settings '{\"commandToExecute\": \"./vm.sh\"}'
+   ```
+   5. List the network security group rules on the virtual machine using the terminal environmental variables
+   ```powershell
+      az network nsg rule list `
+         --resource-group $RESOURCE_GROUP `
+         --nsg-name ${VM_NAME}NSG `
+         --output table
+   ```
+   6. Create network security group rule for the virtual machine using the terminal environmental variables to open the http port (80)
+   ```powershell
+      az network nsg rule create `
+         --resource-group $RESOURCE_GROUP `
+         --nsg-name ${VM_NAME}NSG `
+         --name allow-http `
+         --protocol tcp `
+         --priority 1020 `
+         --destination-port-range 80 `
+         --access allow
+   ```
+   7. Get the public IP address of the virtual machine and save it to the terminal environmental variable `IP_ADDRESS`
+   ```powershell
+      $IP_ADDRESS=$(az vm show `
+         --resource-group $RESOURCE_GROUP `
+         --name $VM_NAME `
+         --show-details `
+         --query [publicIps] `
+         --output tsv)
+    ```
+    8. Check connection to the HTTP server running on the virtual machine
+    ```powershell
       curl --connect-timeout 5 http://$IP_ADDRESS
     ```
 10. Delete all resource groups

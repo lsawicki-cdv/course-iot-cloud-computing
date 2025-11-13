@@ -107,7 +107,9 @@ Variables derive names for all resources from the base `appName` parameter.
 
 ### Step 2: Create Resource Group
 
-Open **Azure Cloud Shell (Bash)** from the Azure Portal.
+Open **Azure Cloud Shell** from the Azure Portal.
+
+**Option A: Using Bash (recommended)**
 
 **Set the resource group name:**
 
@@ -133,7 +135,35 @@ APP_INSIGHTS_LOCATION="uksouth"
 az group create --name $RESOURCE_GROUP --location $LOCATION
 ```
 
+**Option B: Using PowerShell**
+
+**Set the resource group name:**
+
+```powershell
+$RESOURCE_GROUP="cloud-computing-faas"
+```
+
+Set the Azure region (change if needed):
+
+```powershell
+$LOCATION="uksouth"
+```
+
+Set the App Insights region (same as location or closest available):
+
+```powershell
+$APP_INSIGHTS_LOCATION="uksouth"
+```
+
+**Create the resource group:**
+
+```powershell
+az group create --name $RESOURCE_GROUP --location $LOCATION
+```
+
 ### Step 3: Deploy the Bicep Template
+
+**Option A: Using Bash (recommended)**
 
 **Deploy using Azure CLI:**
 
@@ -141,6 +171,17 @@ az group create --name $RESOURCE_GROUP --location $LOCATION
 az deployment group create \
   --resource-group $RESOURCE_GROUP \
   --template-file main.bicep \
+  --parameters appInsightsLocation=$APP_INSIGHTS_LOCATION
+```
+
+**Option B: Using PowerShell**
+
+**Deploy using Azure CLI:**
+
+```powershell
+az deployment group create `
+  --resource-group $RESOURCE_GROUP `
+  --template-file main.bicep `
   --parameters appInsightsLocation=$APP_INSIGHTS_LOCATION
 ```
 
@@ -170,6 +211,8 @@ This command:
 
 ### Step 4: Verify Deployment
 
+**Option A: Using Bash (recommended)**
+
 **List deployed resources:**
 
 ```bash
@@ -189,6 +232,30 @@ az functionapp show \
   --resource-group $RESOURCE_GROUP \
   --name $(az functionapp list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv) \
   --query "defaultHostName" \
+  --output tsv
+```
+
+**Option B: Using PowerShell**
+
+**List deployed resources:**
+
+```powershell
+az resource list --resource-group $RESOURCE_GROUP --output table
+```
+
+You should see 4 resources:
+- Storage account (e.g., `abc123azfunctions`)
+- App Service Plan (e.g., `fnappdef456`)
+- Function App (e.g., `fnappdef456`)
+- Application Insights (e.g., `fnappdef456`)
+
+**Get Function App URL:**
+
+```powershell
+az functionapp show `
+  --resource-group $RESOURCE_GROUP `
+  --name $(az functionapp list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv) `
+  --query "defaultHostName" `
   --output tsv
 ```
 
@@ -243,6 +310,8 @@ Press **Ctrl+C** to stop the local runtime.
 
 ### Step 7: Deploy Function to Azure
 
+**Option A: Using Bash (recommended)**
+
 **Get your Function App name:**
 
 ```bash
@@ -256,9 +325,26 @@ echo "Deploying to: $FUNCTION_APP_NAME"
 func azure functionapp publish $FUNCTION_APP_NAME
 ```
 
+**Option B: Using PowerShell**
+
+**Get your Function App name:**
+
+```powershell
+$FUNCTION_APP_NAME=$(az functionapp list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+echo "Deploying to: $FUNCTION_APP_NAME"
+```
+
+**Deploy your function:**
+
+```powershell
+func azure functionapp publish $FUNCTION_APP_NAME
+```
+
 Wait 1-2 minutes. You'll see output showing the deployment progress and function URLs.
 
 ### Step 8: Test Your Deployed Function
+
+**Option A: Using Bash (recommended)**
 
 **Get the function URL:**
 
@@ -270,6 +356,21 @@ echo "Function URL: $FUNCTION_URL"
 **Test the function:**
 
 ```bash
+curl "$FUNCTION_URL?name=Bicep"
+```
+
+**Option B: Using PowerShell**
+
+**Get the function URL:**
+
+```powershell
+$FUNCTION_URL="https://$(az functionapp show --resource-group $RESOURCE_GROUP --name $FUNCTION_APP_NAME --query 'defaultHostName' -o tsv)/api/HttpExample"
+echo "Function URL: $FUNCTION_URL"
+```
+
+**Test the function:**
+
+```powershell
 curl "$FUNCTION_URL?name=Bicep"
 ```
 
@@ -351,10 +452,21 @@ Create separate parameter files for different environments:
 
 Deploy with:
 
+**Using Bash:**
+
 ```bash
 az deployment group create \
   --resource-group $RESOURCE_GROUP \
   --template-file main.bicep \
+  --parameters dev.parameters.json
+```
+
+**Using PowerShell:**
+
+```powershell
+az deployment group create `
+  --resource-group $RESOURCE_GROUP `
+  --template-file main.bicep `
   --parameters dev.parameters.json
 ```
 
@@ -418,6 +530,8 @@ az group delete --name cloud-computing-faas --yes --no-wait
 
 If you want to keep the resource group:
 
+**Using Bash:**
+
 ```bash
 # Get Function App name
 FUNCTION_APP_NAME=$(az functionapp list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
@@ -435,6 +549,28 @@ az storage account delete --name $STORAGE_NAME --resource-group $RESOURCE_GROUP 
 
 # Get and delete Application Insights
 APP_INSIGHTS_NAME=$(az monitor app-insights component list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+az monitor app-insights component delete --app $APP_INSIGHTS_NAME --resource-group $RESOURCE_GROUP
+```
+
+**Using PowerShell:**
+
+```powershell
+# Get Function App name
+$FUNCTION_APP_NAME=$(az functionapp list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+
+# Delete Function App
+az functionapp delete --name $FUNCTION_APP_NAME --resource-group $RESOURCE_GROUP
+
+# Get and delete App Service Plan
+$PLAN_NAME=$(az appservice plan list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+az appservice plan delete --name $PLAN_NAME --resource-group $RESOURCE_GROUP --yes
+
+# Get and delete Storage Account
+$STORAGE_NAME=$(az storage account list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+az storage account delete --name $STORAGE_NAME --resource-group $RESOURCE_GROUP --yes
+
+# Get and delete Application Insights
+$APP_INSIGHTS_NAME=$(az monitor app-insights component list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
 az monitor app-insights component delete --app $APP_INSIGHTS_NAME --resource-group $RESOURCE_GROUP
 ```
 
@@ -517,6 +653,8 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
 
 ## Reference Commands
 
+**Option A: Using Bash (recommended)**
+
 **Validate Bicep template:**
 
 ```bash
@@ -544,5 +682,37 @@ az deployment group show \
 **Export existing resources to Bicep:**
 
 ```bash
+az bicep decompile --file existing-template.json
+```
+
+**Option B: Using PowerShell**
+
+**Validate Bicep template:**
+
+```powershell
+az bicep build --file main.bicep
+```
+
+**Preview changes before deployment (What-If):**
+
+```powershell
+az deployment group what-if `
+  --resource-group $RESOURCE_GROUP `
+  --template-file main.bicep `
+  --parameters appInsightsLocation=$APP_INSIGHTS_LOCATION
+```
+
+**View deployment logs:**
+
+```powershell
+az deployment group show `
+  --resource-group $RESOURCE_GROUP `
+  --name main `
+  --query properties.error
+```
+
+**Export existing resources to Bicep:**
+
+```powershell
 az bicep decompile --file existing-template.json
 ```

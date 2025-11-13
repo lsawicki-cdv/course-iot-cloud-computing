@@ -48,7 +48,9 @@ Before starting, ensure you have:
 
 ### Step 1: Create IoT Hub and Device
 
-Open **Azure Cloud Shell (Bash)** from the Azure Portal.
+Open **Azure Cloud Shell** from the Azure Portal.
+
+**Option A: Using Bash (recommended)**
 
 **Set the environment variables one by one:**
 
@@ -101,6 +103,64 @@ az iot hub device-identity create \
 az iot hub generate-sas-token \
   --hub-name $IOT_HUB_NAME \
   --device-id $IOT_DEVICE_NAME \
+  --output table
+```
+
+**Important:** Copy the **SAS token** - you'll need it for the device simulator.
+
+**Option B: Using PowerShell**
+
+**Set the environment variables one by one:**
+
+Set the resource group name:
+```powershell
+$RESOURCE_GROUP="resourceGroupIotPlatform"
+```
+
+Set the Azure region (change if needed):
+```powershell
+$LOCATION="uksouth"
+```
+
+Set the IoT Hub name (**must be globally unique** - change this!):
+```powershell
+$IOT_HUB_NAME="cdv-iot-platform-hub-12345"
+```
+
+Set your device name:
+```powershell
+$IOT_DEVICE_NAME="my-iot-device-01"
+```
+
+**Create the resource group:**
+```powershell
+az group create --name $RESOURCE_GROUP --location $LOCATION
+```
+
+**Create the IoT Hub (this will take 2-3 minutes):**
+```powershell
+az iot hub create `
+  --resource-group $RESOURCE_GROUP `
+  --name $IOT_HUB_NAME `
+  --location $LOCATION `
+  --sku F1 `
+  --partition-count 2
+```
+
+**Important:** Save your IoT Hub name - you'll need it throughout this exercise!
+
+**Create device identity:**
+```powershell
+az iot hub device-identity create `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $IOT_DEVICE_NAME
+```
+
+**Generate SAS token for device authentication:**
+```powershell
+az iot hub generate-sas-token `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $IOT_DEVICE_NAME `
   --output table
 ```
 
@@ -194,6 +254,8 @@ Cosmos DB is a globally distributed NoSQL database that will store our IoT data 
 
 Go back to **Azure Cloud Shell**.
 
+**Option A: Using Bash (recommended)**
+
 **Set the Cosmos DB account name (must be globally unique):**
 ```bash
 COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-12345"
@@ -274,6 +336,88 @@ az cosmosdb keys list \
 
 **Important:** Save both the **endpoint** and **primary key** - you'll need them for Azure Functions and Stream Analytics.
 
+**Option B: Using PowerShell**
+
+**Set the Cosmos DB account name (must be globally unique):**
+```powershell
+$COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-12345"
+```
+
+Set the database name:
+```powershell
+$COSMOS_DB_DATABASE_NAME="iot-platform-database"
+```
+
+**Create Cosmos DB account (this takes 3-5 minutes):**
+```powershell
+az cosmosdb create `
+  --name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --locations regionName=$LOCATION `
+  --enable-free-tier true `
+  --default-consistency-level "Session"
+```
+
+**Create database:**
+```powershell
+az cosmosdb sql database create `
+  --account-name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --name $COSMOS_DB_DATABASE_NAME `
+  --throughput 400
+```
+
+**Create container for IoT telemetry data:**
+```powershell
+az cosmosdb sql container create `
+  --account-name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --database-name $COSMOS_DB_DATABASE_NAME `
+  --name "iot-data" `
+  --partition-key-path "/deviceid"
+```
+
+**Create container for house data:**
+```powershell
+az cosmosdb sql container create `
+  --account-name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --database-name $COSMOS_DB_DATABASE_NAME `
+  --name "house-data" `
+  --partition-key-path "/id"
+```
+
+**Create container for room data:**
+```powershell
+az cosmosdb sql container create `
+  --account-name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --database-name $COSMOS_DB_DATABASE_NAME `
+  --name "room-data" `
+  --partition-key-path "/id"
+```
+
+**Get Cosmos DB endpoint:**
+```powershell
+az cosmosdb show `
+  --name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query "documentEndpoint" `
+  --output tsv
+```
+
+**Get Cosmos DB primary key:**
+```powershell
+az cosmosdb keys list `
+  --name $COSMOS_DB_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --type keys `
+  --query "primaryMasterKey" `
+  --output tsv
+```
+
+**Important:** Save both the **endpoint** and **primary key** - you'll need them for Azure Functions and Stream Analytics.
+
 ---
 
 ## Part 3: Create Azure Stream Analytics Job
@@ -281,6 +425,8 @@ az cosmosdb keys list \
 Stream Analytics will read data from IoT Hub, transform it, and write it to Cosmos DB in real-time.
 
 ### Step 4: Create Stream Analytics Job
+
+**Option A: Using Bash (recommended)**
 
 **Set the Stream Analytics job name:**
 ```bash
@@ -293,6 +439,22 @@ az stream-analytics job create \
   --resource-group $RESOURCE_GROUP \
   --name $STREAM_ANALYTICS_JOB_NAME \
   --location $LOCATION \
+  --output-error-policy Stop
+```
+
+**Option B: Using PowerShell**
+
+**Set the Stream Analytics job name:**
+```powershell
+$STREAM_ANALYTICS_JOB_NAME="stream-iot-data"
+```
+
+**Create Stream Analytics job:**
+```powershell
+az stream-analytics job create `
+  --resource-group $RESOURCE_GROUP `
+  --name $STREAM_ANALYTICS_JOB_NAME `
+  --location $LOCATION `
   --output-error-policy Stop
 ```
 
@@ -377,6 +539,8 @@ Now we'll create a serverless REST API using Azure Functions to query and manage
 
 ### Step 8: Create Azure Function App
 
+**Option A: Using Bash (recommended)**
+
 **Set the Function App name (must be globally unique):**
 ```bash
 FUNCTION_APP_NAME="cdv-iot-platform-func-12345"
@@ -411,6 +575,46 @@ az functionapp create \
 
 **Important:** Save your Function App name and URL:
 ```bash
+echo "Your Function App name: $FUNCTION_APP_NAME"
+echo "Your Function App URL: https://$FUNCTION_APP_NAME.azurewebsites.net"
+```
+
+**Option B: Using PowerShell**
+
+**Set the Function App name (must be globally unique):**
+```powershell
+$FUNCTION_APP_NAME="cdv-iot-platform-func-12345"
+```
+
+Set the storage account name (must be globally unique, lowercase, no hyphens):
+```powershell
+$STORAGE_ACCOUNT_NAME="iotfuncstorage12345"
+```
+
+**Create Storage Account (required for Functions):**
+```powershell
+az storage account create `
+  --name $STORAGE_ACCOUNT_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --location $LOCATION `
+  --sku Standard_LRS
+```
+
+**Create Function App:**
+```powershell
+az functionapp create `
+  --resource-group $RESOURCE_GROUP `
+  --consumption-plan-location $LOCATION `
+  --name $FUNCTION_APP_NAME `
+  --storage-account $STORAGE_ACCOUNT_NAME `
+  --runtime python `
+  --functions-version 4 `
+  --runtime-version 3.11 `
+  --os-type Linux
+```
+
+**Important:** Save your Function App name and URL:
+```powershell
 echo "Your Function App name: $FUNCTION_APP_NAME"
 echo "Your Function App URL: https://$FUNCTION_APP_NAME.azurewebsites.net"
 ```
@@ -495,11 +699,22 @@ Azure Functions are protected by access keys by default. Get your function key:
 3. Copy the **default** key under **Host keys**
 
 **Option 2: Via Azure CLI**
+
+**Using Bash:**
 ```bash
 az functionapp keys list \
   --name $FUNCTION_APP_NAME \
   --resource-group $RESOURCE_GROUP \
   --query "functionKeys.default" \
+  --output tsv
+```
+
+**Using PowerShell:**
+```powershell
+az functionapp keys list `
+  --name $FUNCTION_APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query "functionKeys.default" `
   --output tsv
 ```
 

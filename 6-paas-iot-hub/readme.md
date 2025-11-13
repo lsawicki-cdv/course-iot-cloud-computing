@@ -79,7 +79,9 @@ Now you'll create your own MQTT broker instead of using the public test server. 
 
 ### Step 8: Create Azure Virtual Machine
 
-Open **Azure Cloud Shell (Bash)** from the Azure Portal.
+Open **Azure Cloud Shell** from the Azure Portal.
+
+**Option A: Using Bash (recommended)**
 
 **Set the environment variables one by one:**
 
@@ -146,6 +148,76 @@ az network nsg rule create \
   --protocol tcp \
   --priority 1020 \
   --destination-port-range 1883 \
+  --access allow
+```
+
+**Option B: Using PowerShell**
+
+**Set the environment variables one by one:**
+
+Set the resource group name:
+```powershell
+$RESOURCE_GROUP="myResourceGroupVMForDocker"
+```
+
+Set the Azure region (change if needed):
+```powershell
+$LOCATION="uksouth"
+```
+
+Set the VM name:
+```powershell
+$VM_NAME="my-vm-mqtt-docker"
+```
+
+Set the VM image:
+```powershell
+$IMAGE="Ubuntu2204"
+```
+
+Set the VM size:
+```powershell
+$SIZE="Standard_B1s"
+```
+
+**Create the resource group:**
+```powershell
+az group create --name $RESOURCE_GROUP --location $LOCATION
+```
+
+**Create the virtual machine (this will take a few minutes):**
+```powershell
+az vm create `
+  --resource-group $RESOURCE_GROUP `
+  --name $VM_NAME `
+  --image $IMAGE `
+  --size $SIZE `
+  --admin-username azureuser `
+  --generate-ssh-keys
+```
+
+**Important:** The command output will show your VM's **public IP address**. Copy and save it - you'll need it later!
+
+**Install Docker on the VM:**
+```powershell
+az vm extension set `
+  --resource-group $RESOURCE_GROUP `
+  --vm-name $VM_NAME `
+  --name DockerExtension `
+  --publisher Microsoft.Azure.Extensions `
+  --version 1.0 `
+  --settings '{\"docker\": {\"port\": \"2375\"}}'
+```
+
+**Open port 1883 for MQTT traffic:**
+```powershell
+az network nsg rule create `
+  --resource-group $RESOURCE_GROUP `
+  --nsg-name ${VM_NAME}NSG `
+  --name allow-mqtt `
+  --protocol tcp `
+  --priority 1020 `
+  --destination-port-range 1883 `
   --access allow
 ```
 
@@ -231,7 +303,9 @@ Now you'll connect to Azure IoT Hub - a managed service with enterprise features
 
 ### Step 11: Create Azure IoT Hub
 
-Go back to **Azure Cloud Shell (Bash)**.
+Go back to **Azure Cloud Shell**.
+
+**Option A: Using Bash (recommended)**
 
 **Set the environment variables one by one:**
 
@@ -282,6 +356,62 @@ az iot hub device-identity create \
 az iot hub generate-sas-token \
   --hub-name $IOT_HUB_NAME \
   --device-id $IOT_DEVICE_NAME \
+  --output table
+```
+
+**Important:** Copy the **SAS token** from the output - you'll need it in the next step!
+
+**Option B: Using PowerShell**
+
+**Set the environment variables one by one:**
+
+Set the resource group name:
+```powershell
+$RESOURCE_GROUP="myIotHubResourceGroup"
+```
+
+Set the Azure region:
+```powershell
+$LOCATION="uksouth"
+```
+
+Set the IoT Hub name (**must be globally unique** - change this!):
+```powershell
+$IOT_HUB_NAME="iot-hub-yourname-12345"
+```
+
+Set your device name:
+```powershell
+$IOT_DEVICE_NAME="my-device-01"
+```
+
+**Create the resource group:**
+```powershell
+az group create --name $RESOURCE_GROUP --location $LOCATION
+```
+
+**Create the IoT Hub (this will take a few minutes):**
+```powershell
+az iot hub create `
+  --resource-group $RESOURCE_GROUP `
+  --name $IOT_HUB_NAME `
+  --location $LOCATION `
+  --sku F1 `
+  --partition-count 2
+```
+
+**Register your device with IoT Hub:**
+```powershell
+az iot hub device-identity create `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $IOT_DEVICE_NAME
+```
+
+**Generate authentication token (SAS token):**
+```powershell
+az iot hub generate-sas-token `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $IOT_DEVICE_NAME `
   --output table
 ```
 

@@ -27,7 +27,9 @@ Change the Azure Cosmos DB endpoint URL and the key in the `config.py` file.
       .venv\scripts\activate
    ```
 6. Install dependencies: `pip install -r requirements.txt`
-7. Issue the following commands in **the Azure Cloud Shell (Bash)**
+7. Issue the following commands in **the Azure Cloud Shell**
+
+   **Option A: Using Bash (recommended)**
    1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP="myResourceGroupCosmosDb"
@@ -50,6 +52,31 @@ Change the Azure Cosmos DB endpoint URL and the key in the `config.py` file.
    ```bash
       az cosmosdb keys list --name $COSMOS_DB_ACCOUNT --resource-group $RESOURCE_GROUP --type connection-strings --query "connectionStrings[0].connectionString" --output tsv
    ```
+
+   **Option B: Using PowerShell**
+   1. Set the terminal environmental variables (PowerShell syntax)
+   ```powershell
+      $RESOURCE_GROUP="myResourceGroupCosmosDb"
+   ```
+   ```powershell
+      $COSMOS_DB_ACCOUNT="my-cosmos-super-db"
+   ```
+   ```powershell
+      $LOCATION="uksouth"  # Change to your allowed region if needed
+   ```
+   2. Create a resource group using the terminal environmental variables
+   ```powershell
+      az group create --name $RESOURCE_GROUP --location $LOCATION
+   ```
+   3. Create a free tier CosmosDB account for NoSQL
+   ```powershell
+      az cosmosdb create --name $COSMOS_DB_ACCOUNT --resource-group $RESOURCE_GROUP --locations regionName=$LOCATION --enable-free-tier true --default-consistency-level "Session"
+   ```
+   4. Get URL of the database and master key to get access
+   ```powershell
+      az cosmosdb keys list --name $COSMOS_DB_ACCOUNT --resource-group $RESOURCE_GROUP --type connection-strings --query "connectionStrings[0].connectionString" --output tsv
+   ```
+
    5. Based on the output from the previous command change properties in the `config.py`
 8. Run the Python script from the `9-storage-cosmosdb` directory: `python azure-cosmosdb-sample.py`
 9. Check if items where created.

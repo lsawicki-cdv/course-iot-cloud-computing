@@ -119,7 +119,9 @@ Outputs provide important information after deployment.
 
 ### Step 2: Deploy Using Azure Cloud Shell
 
-Open **Azure Cloud Shell (Bash)** from the Azure Portal.
+Open **Azure Cloud Shell** from the Azure Portal.
+
+**Option A: Using Bash (recommended)**
 
 **Set the resource group name:**
 
@@ -147,6 +149,8 @@ az group create --name $RESOURCE_GROUP --location $LOCATION
 
 ### Step 3: Deploy the Bicep Template
 
+**Option A: Using Bash (recommended)**
+
 **Deploy IoT Hub and Storage infrastructure:**
 
 ```bash
@@ -169,7 +173,57 @@ az deployment group show \
 
 This shows the IoT Hub name, resource ID, and location.
 
+**Option B: Using PowerShell**
+
+**Set the resource group name:**
+
+```powershell
+$RESOURCE_GROUP="cloud-computing-iot-hub"
+```
+
+Set the Azure region (change if needed):
+
+```powershell
+$LOCATION="uksouth"
+```
+
+Set the project name (1-11 characters, used as prefix):
+
+```powershell
+$PROJECT_NAME="contoso"
+```
+
+**Create the resource group:**
+
+```powershell
+az group create --name $RESOURCE_GROUP --location $LOCATION
+```
+
+**Deploy IoT Hub and Storage infrastructure:**
+
+```powershell
+az deployment group create `
+  --resource-group $RESOURCE_GROUP `
+  --template-file main.bicep `
+  --parameters projectName=$PROJECT_NAME
+```
+
+**Wait 2-3 minutes for deployment to complete**. You'll see output showing the deployed resources.
+
+**View deployment outputs:**
+
+```powershell
+az deployment group show `
+  --resource-group $RESOURCE_GROUP `
+  --name main `
+  --query properties.outputs
+```
+
+This shows the IoT Hub name, resource ID, and location.
+
 ### Step 4: Verify Deployed Resources
+
+**Option A: Using Bash (recommended)**
 
 **List all resources:**
 
@@ -195,11 +249,39 @@ STORAGE_ACCOUNT_NAME=$(az storage account list --resource-group $RESOURCE_GROUP 
 echo "Your Storage Account name: $STORAGE_ACCOUNT_NAME"
 ```
 
+**Option B: Using PowerShell**
+
+**List all resources:**
+
+```powershell
+az resource list --resource-group $RESOURCE_GROUP --output table
+```
+
+You should see:
+- Storage account (e.g., `contoso<unique-string>`)
+- IoT Hub (e.g., `contosoHub<unique-string>`)
+
+**Get IoT Hub name:**
+
+```powershell
+$IOT_HUB_NAME=$(az iot hub list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+echo "Your IoT Hub name: $IOT_HUB_NAME"
+```
+
+**Get Storage Account name:**
+
+```powershell
+$STORAGE_ACCOUNT_NAME=$(az storage account list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+echo "Your Storage Account name: $STORAGE_ACCOUNT_NAME"
+```
+
 ---
 
 ## Part 3: Create IoT Device and Configure Simulator
 
 ### Step 5: Register Device in IoT Hub
+
+**Option A: Using Bash (recommended)**
 
 **Create a device identity:**
 
@@ -219,6 +301,36 @@ az iot hub device-identity create \
 az iot hub device-identity connection-string show \
   --hub-name $IOT_HUB_NAME \
   --device-id $DEVICE_ID \
+  --output table
+```
+
+**Important:** Copy the **connection string** - you'll need it for the device simulator.
+
+The connection string looks like:
+```
+HostName=contosoHub....azure-devices.net;DeviceId=my-bicep-device-01;SharedAccessKey=...
+```
+
+**Option B: Using PowerShell**
+
+**Create a device identity:**
+
+```powershell
+$DEVICE_ID="my-bicep-device-01"
+```
+
+```powershell
+az iot hub device-identity create `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $DEVICE_ID
+```
+
+**Get device connection string:**
+
+```powershell
+az iot hub device-identity connection-string show `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $DEVICE_ID `
   --output table
 ```
 
@@ -346,6 +458,8 @@ The simulator sends telemetry every 10 seconds. **Keep it running** for at least
 
 **Option 2: Via Azure CLI**
 
+**Using Bash:**
+
 **List blobs in container:**
 
 ```bash
@@ -372,6 +486,40 @@ az storage blob download \
   --container-name "${PROJECT_NAME}results" \
   --name "$BLOB_NAME" \
   --file downloaded-telemetry.json \
+  --auth-mode login
+
+# View the content
+cat downloaded-telemetry.json
+```
+
+**Using PowerShell:**
+
+**List blobs in container:**
+
+```powershell
+az storage blob list `
+  --account-name $STORAGE_ACCOUNT_NAME `
+  --container-name "${PROJECT_NAME}results" `
+  --output table `
+  --auth-mode login
+```
+
+**Download a blob to inspect:**
+
+```powershell
+# Get the first blob name
+$BLOB_NAME=$(az storage blob list `
+  --account-name $STORAGE_ACCOUNT_NAME `
+  --container-name "${PROJECT_NAME}results" `
+  --auth-mode login `
+  --query "[0].name" -o tsv)
+
+# Download the blob
+az storage blob download `
+  --account-name $STORAGE_ACCOUNT_NAME `
+  --container-name "${PROJECT_NAME}results" `
+  --name "$BLOB_NAME" `
+  --file downloaded-telemetry.json `
   --auth-mode login
 
 # View the content

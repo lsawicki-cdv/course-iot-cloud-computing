@@ -2,7 +2,9 @@
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** and **East US** as default regions, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
-1. Issue the following commands in **the Azure Cloud Shell (Bash)**
+1. Issue the following commands in **the Azure Cloud Shell**
+
+   **Option A: Using Bash (recommended)**
    1. Set the terminal environmental variables
    ```bash
       RESOURCE_GROUP="myResourceGroupVMForDocker"
@@ -53,7 +55,7 @@
          --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh"]}' \
          --protected-settings '{"commandToExecute": "./install-azure-cli.sh"}'
    ```
-   6. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container 
+   6. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container
    ```bash
       az network nsg rule create \
          --resource-group $RESOURCE_GROUP \
@@ -64,9 +66,72 @@
          --destination-port-range 8080 \
          --access allow
    ```
+
+   **Option B: Using PowerShell**
+   1. Set the terminal environmental variables (PowerShell syntax)
+   ```powershell
+      $RESOURCE_GROUP="myResourceGroupVMForDocker"
+   ```
+   ```powershell
+      $LOCATION="uksouth"  # Change to your allowed region if needed
+   ```
+   ```powershell
+      $VM_NAME="my-vm-mqtt-docker"
+   ```
+   ```powershell
+      $IMAGE="Ubuntu2204"
+   ```
+   ```powershell
+      $SIZE="Standard_B1s"
+   ```
+   2. Create a resource group using the terminal environmental variables
+   ```powershell
+   az group create --name $RESOURCE_GROUP --location $LOCATION
+   ```
+   3. Create a virtual machine using the terminal environmental variables
+   ```powershell
+      az vm create `
+         --resource-group $RESOURCE_GROUP `
+         --name $VM_NAME `
+         --image $IMAGE `
+         --size $SIZE `
+         --admin-username azureuser `
+         --generate-ssh-keys
+   ```
+   4. Install the docker engine on the virtual machine set using the terminal environmental variables
+   ```powershell
+      az vm extension set `
+         --resource-group $RESOURCE_GROUP `
+         --vm-name $VM_NAME `
+         --name DockerExtension `
+         --publisher Microsoft.Azure.Extensions `
+         --version 1.0 `
+         --settings '{\"docker\": {\"port\": \"2375\"}}'
+   ```
+   5. Install the Azure CLI on the virtual machine set using the terminal environmental variables
+   ```powershell
+      az vm extension set `
+         --resource-group $RESOURCE_GROUP `
+         --vm-name $VM_NAME `
+         --name customScript `
+         --publisher Microsoft.Azure.Extensions `
+         --settings '{\"fileUris\":[\"https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh\"]}' `
+         --protected-settings '{\"commandToExecute\": \"./install-azure-cli.sh\"}'
+   ```
+   6. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container
+   ```powershell
+      az network nsg rule create `
+         --resource-group $RESOURCE_GROUP `
+         --nsg-name ${VM_NAME}NSG `
+         --name allow-http `
+         --protocol tcp `
+         --priority 1020 `
+         --destination-port-range 8080 `
+         --access allow
+   ```
 2. Access the Virtual machine using "SSH using Azure CLI" on the Azure portal
 3. In the SSH of the Virtual Machine issue the following commands:
-   1. Create Dockerfile 
+   1. Create Dockerfile
    ```bash
       nano Dockerfile
    ```
@@ -154,7 +219,7 @@
       REGISTRY_USERNAME=$(az acr credential show --name $ACI_NAME --query username --output tsv)
 
       REGISTRY_PASSWORD=$(az acr credential show --name $ACI_NAME --query passwords[0].value --output tsv)
-      
+
       az container create --resource-group $RESOURCE_GROUP --name $ACI_NAME --image $ACI_NAME.azurecr.io/$ACI_IMAGE --cpu 1 --memory 1 --registry-login-server $ACI_NAME.azurecr.io --registry-username $REGISTRY_USERNAME --registry-password $REGISTRY_PASSWORD --dns-name-label $ACI_NAME --ports 80 --os-type Linux
    ```
 6. Check in the web browser or using `curl` that the HTTP traffic goes to the Docker Container in the Azure Container instances on port 80

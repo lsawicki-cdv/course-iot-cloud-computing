@@ -105,6 +105,8 @@ You'll create 4 Terraform files to define your IoT infrastructure:
 nano providers.tf
 ```
 
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code providers.tf` to open the Cloud Shell editor (GUI).
+
 **Copy and paste this content:**
 
 ```hcl
@@ -136,6 +138,8 @@ provider "azurerm" {
 ```bash
 nano variables.tf
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code variables.tf` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -182,6 +186,8 @@ variable "container_name" {
 ```bash
 nano main.tf
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code main.tf` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -287,6 +293,8 @@ resource "azurerm_iothub_shared_access_policy" "policy" {
 ```bash
 nano outputs.tf
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code outputs.tf` to open the Cloud Shell editor (GUI).
 
 **Copy and paste this content:**
 
@@ -425,6 +433,8 @@ HostName=terraform-iot-hub.azure-devices.net;SharedAccessKeyName=terraform-polic
 
 ### Step 11: Create IoT Device
 
+**Option A: Using Bash (recommended)**
+
 **Create a device identity:**
 
 ```bash
@@ -444,6 +454,32 @@ az iot hub device-identity create \
 az iot hub device-identity connection-string show \
   --hub-name $IOT_HUB_NAME \
   --device-id $DEVICE_ID \
+  --output table
+```
+
+**Important:** Copy the **device connection string** - you'll need it for the simulator.
+
+**Option B: Using PowerShell**
+
+**Create a device identity:**
+
+```powershell
+$IOT_HUB_NAME=$(terraform output -raw iot_hub_name)
+$DEVICE_ID="terraform-device-01"
+```
+
+```powershell
+az iot hub device-identity create `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $DEVICE_ID
+```
+
+**Get device connection string:**
+
+```powershell
+az iot hub device-identity connection-string show `
+  --hub-name $IOT_HUB_NAME `
+  --device-id $DEVICE_ID `
   --output table
 ```
 
@@ -470,6 +506,8 @@ cat simple_azure_device_simulator.py
 ```bash
 nano simple_azure_device_simulator.py
 ```
+
+**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code simple_azure_device_simulator.py` to open the Cloud Shell editor (GUI).
 
 **Change line 9** from:
 ```python
@@ -542,6 +580,8 @@ Message sent: {"temperature": 25.1, "humidity": 53.8, "pressure": 1013.5}
 
 **Option 2: Via Azure CLI**
 
+**Using Bash:**
+
 **List blobs:**
 
 ```bash
@@ -571,6 +611,43 @@ az storage blob download \
   --container-name $CONTAINER \
   --name "$BLOB_NAME" \
   --file telemetry-data.json \
+  --auth-mode login
+
+# View content
+cat telemetry-data.json
+```
+
+**Using PowerShell:**
+
+**List blobs:**
+
+```powershell
+$STORAGE_ACCOUNT=$(terraform output -raw storage_account_name)
+$CONTAINER=$(terraform output -raw blob_container_name)
+
+az storage blob list `
+  --account-name $STORAGE_ACCOUNT `
+  --container-name $CONTAINER `
+  --output table `
+  --auth-mode login
+```
+
+**Download a blob:**
+
+```powershell
+# Get the first blob name
+$BLOB_NAME=$(az storage blob list `
+  --account-name $STORAGE_ACCOUNT `
+  --container-name $CONTAINER `
+  --auth-mode login `
+  --query "[0].name" -o tsv)
+
+# Download it
+az storage blob download `
+  --account-name $STORAGE_ACCOUNT `
+  --container-name $CONTAINER `
+  --name "$BLOB_NAME" `
+  --file telemetry-data.json `
   --auth-mode login
 
 # View content
@@ -707,7 +784,13 @@ Wait 2-3 minutes. All 7 resources will be deleted.
 
 **Verify cleanup:**
 
+**Using Bash:**
 ```bash
+az group list --output table | grep iot-terraform
+```
+
+**Using PowerShell:**
+```powershell
 az group list --output table | grep iot-terraform
 ```
 
