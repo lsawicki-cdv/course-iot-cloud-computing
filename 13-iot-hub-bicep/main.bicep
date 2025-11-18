@@ -52,6 +52,7 @@ resource IoTHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
     capacity: skuUnits
   }
   properties: {
+    minTlsVersion: '1.2'
     eventHubEndpoints: {
       events: {
         retentionTimeInDays: 1
