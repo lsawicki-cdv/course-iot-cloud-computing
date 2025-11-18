@@ -15,19 +15,11 @@ param location string = resourceGroup().location
 @description('Location for Application Insights')
 param appInsightsLocation string
 
-@description('The language worker runtime to load in the function app.')
-@allowed([
-  'node'
-  'dotnet'
-  'java'
-])
-param runtime string = 'node'
-
 var functionAppName = appName
 var hostingPlanName = appName
 var applicationInsightsName = appName
 var storageAccountName = '${uniqueString(resourceGroup().id)}azfunctions'
-var functionWorkerRuntime = runtime
+var functionWorkerRuntime = 'node'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
   name: storageAccountName
@@ -81,7 +73,7 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
         }
         {
           name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~14'
+          value: '~20'
         }
         {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
