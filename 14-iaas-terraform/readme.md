@@ -901,7 +901,7 @@ output "ip" {
 - **Terraform**: Multi-cloud, complex workflows, existing Terraform codebase
 - **Bicep**: Azure-only, simpler projects, tight Azure integration
 
-## Next Steps
+## Optional Next Steps
 
 - Compare this exercise with Exercise 2 (manual VM creation) - how much faster is IaC?
 - Modify the configuration to use a different VM size or Linux distribution

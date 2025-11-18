@@ -833,7 +833,7 @@ This exercise reinforces the **Cold Path** storage pattern:
 
 **Both are excellent choices** - the "best" tool depends on your specific needs!
 
-## Next Steps
+## Optional Next Steps
 
 - Modify the route condition to filter messages (like Exercise 13's `level="storage"`)
 - Add a second route to send data to Event Grid or Service Bus

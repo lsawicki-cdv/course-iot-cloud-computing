@@ -741,7 +741,7 @@ Messages are automatically archived to Blob Storage for:
 | Infrastructure | Manual setup | Version controlled |
 | Time to Deploy | 15-20 minutes | 3-5 minutes |
 
-## Next Steps
+## Optional Next Steps
 
 - Modify the Bicep template to add multiple routing rules (e.g., alerts to Event Grid)
 - Change the file format from JSON to Avro for more efficient storage

@@ -632,7 +632,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
 }
 ```
 
-## Next Steps
+## Optional Next Steps
 
 - Explore the Bicep file and modify parameters (try changing runtime to 'dotnet' or 'java')
 - Add outputs to the Bicep file to display Function App URL after deployment
