@@ -23,6 +23,7 @@ Exercises with an AWS version:
 - 1 - Cloud account
 - 2 - IaaS (Virtual Machine / EC2)
 - 3 - IaaS scale set (Virtual Machine Scale Set / Auto Scaling group)
+- 4 - Containers (Container Instances / ECS on Fargate)
 
 ## Remote development over SSH using Visual Studio Code
 

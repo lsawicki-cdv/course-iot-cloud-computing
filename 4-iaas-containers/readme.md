@@ -1,5 +1,7 @@
 ### Azure Container Instance
 
+> Using AWS instead? Follow the [AWS version of this task](aws/readme.md).
+
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** and **East US** as default regions, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
 1. Issue the following commands in **the Azure Cloud Shell**
@@ -52,7 +54,7 @@
          --vm-name $VM_NAME \
          --name customScript \
          --publisher Microsoft.Azure.Extensions \
-         --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh"]}' \
+         --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-containers/install-azure-cli.sh"]}' \
          --protected-settings '{"commandToExecute": "./install-azure-cli.sh"}'
    ```
    6. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container
@@ -115,7 +117,7 @@
          --vm-name $VM_NAME `
          --name customScript `
          --publisher Microsoft.Azure.Extensions `
-         --settings '{\"fileUris\":[\"https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh\"]}' `
+         --settings '{\"fileUris\":[\"https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-containers/install-azure-cli.sh\"]}' `
          --protected-settings '{\"commandToExecute\": \"./install-azure-cli.sh\"}'
    ```
    6. Create network security group rule for the virtual machine scale using the terminal environmental variables to open the 8080 port that will be used later by the HTTP server in a Docker container

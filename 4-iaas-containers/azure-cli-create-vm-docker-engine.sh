@@ -34,7 +34,7 @@ az vm extension set \
   --vm-name $VM_NAME \
   --name customScript \
   --publisher Microsoft.Azure.Extensions \
-  --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-container-instance/install-azure-cli.sh"]}' \
+  --settings '{"fileUris":["https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/refs/heads/main/4-iaas-containers/install-azure-cli.sh"]}' \
   --protected-settings '{"commandToExecute": "./install-azure-cli.sh"}'
 
 # Create network security group rule
