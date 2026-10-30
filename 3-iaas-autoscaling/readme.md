@@ -1,5 +1,7 @@
 ### Azure Virtual Machine Scale Set task
 
+> Using AWS instead? Follow the [AWS version of this task](aws/readme.md).
+
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
 1. Open the Azure Cloud Shell
