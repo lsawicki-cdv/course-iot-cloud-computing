@@ -8,6 +8,7 @@ This course provides an in-depth understanding of IoT and Cloud Computing using 
 - Docker and Azure Container Instances
 - Learn about Azure IoT Hub and its components.
 - Explore Azure services like Azure Functions, and Azure Cosmos DB.
+- Store IoT data in relational (PostgreSQL) and NoSQL databases.
 - Develop and deploy IoT solutions using Azure.
 - Compare Azure services with their AWS counterparts.
 
@@ -26,6 +27,7 @@ Exercises with an AWS version:
 - 4 - Containers (Container Instances / ECS on Fargate)
 - 5 - PaaS web app (App Service / App Runner or Elastic Beanstalk)
 - 6 - IoT over MQTT (IoT Hub / IoT Core)
+- 7 - PostgreSQL database (Azure Database for PostgreSQL / Amazon RDS)
 
 ## Remote development over SSH using Visual Studio Code
 
