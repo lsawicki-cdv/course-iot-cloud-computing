@@ -319,10 +319,10 @@ This is the AWS version of the [Azure Virtual Machine Scale Set task](../readme.
    aws elbv2 wait load-balancers-deleted --region $REGION --load-balancer-arns $LOAD_BALANCER_ARN
    ```
    ```bash
-   aws elbv2 delete-target-group --region $REGION --target-group-arn $TARGET_GROUP_ARN
+   aws ec2 wait instance-terminated --region $REGION --filters Name=tag:aws:autoscaling:groupName,Values=$SCALE_SET_NAME
    ```
    ```bash
-   aws ec2 wait instance-terminated --region $REGION --filters Name=tag:aws:autoscaling:groupName,Values=$SCALE_SET_NAME
+   aws elbv2 delete-target-group --region $REGION --target-group-arn $TARGET_GROUP_ARN
    ```
    ```bash
    aws ec2 delete-launch-template --region $REGION --launch-template-name "$SCALE_SET_NAME-template"
@@ -330,7 +330,7 @@ This is the AWS version of the [Azure Virtual Machine Scale Set task](../readme.
    ```bash
    aws ec2 delete-security-group --region $REGION --group-id $SECURITY_GROUP_ID
    ```
-   If deleting the security group fails with `DependencyViolation`, the load balancer is still releasing its network interfaces. Wait a minute and try again.
+   If deleting the target group fails with `ResourceInUse`, or deleting the security group fails with `DependencyViolation`, AWS is still removing the load balancer's listener or network interfaces. Wait a minute and try again.
 5. Do the same however using the AWS Console, not the AWS CLI
    1. Region: Europe (London) (or another region), selected in the top-right corner of the Console
    2. Go to EC2 → Launch Templates → "Create launch template"

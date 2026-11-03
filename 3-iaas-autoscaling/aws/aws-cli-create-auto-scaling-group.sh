@@ -120,7 +120,7 @@ curl --connect-timeout 5 http://$LB_ADDRESS
 # aws autoscaling delete-auto-scaling-group --region $REGION --auto-scaling-group-name $SCALE_SET_NAME --force-delete
 # aws elbv2 delete-load-balancer --region $REGION --load-balancer-arn $LOAD_BALANCER_ARN
 # aws elbv2 wait load-balancers-deleted --region $REGION --load-balancer-arns $LOAD_BALANCER_ARN
-# aws elbv2 delete-target-group --region $REGION --target-group-arn $TARGET_GROUP_ARN
 # aws ec2 wait instance-terminated --region $REGION --filters Name=tag:aws:autoscaling:groupName,Values=$SCALE_SET_NAME
+# aws elbv2 delete-target-group --region $REGION --target-group-arn $TARGET_GROUP_ARN
 # aws ec2 delete-launch-template --region $REGION --launch-template-name ${SCALE_SET_NAME}-template
 # aws ec2 delete-security-group --region $REGION --group-id $SECURITY_GROUP_ID
