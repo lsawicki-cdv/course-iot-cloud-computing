@@ -1,6 +1,8 @@
 # Azure Functions - Serverless Computing Exercise
 
-In this exercise, you will learn how to create and deploy serverless functions using Azure Functions. You'll build an HTTP-triggered function, test it locally, and deploy it to Azure.
+> Using AWS instead? Follow the [AWS version of this exercise](aws/readme.md).
+
+In this exercise, you will learn how to create and deploy serverless functions using Azure Functions. You'll build an HTTP-triggered function, test it locally, and deploy it to Azure. In Part 5 you'll turn a function into a small **AI agent** that answers questions about IoT devices with a model from Azure OpenAI in Microsoft Foundry.
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
@@ -25,7 +27,7 @@ In this exercise, you will learn how to create and deploy serverless functions u
 ## Tested Environments
 
 - Ubuntu 22.04 / 24.04
-- Python 3.10+
+- Python 3.10+ locally, Python 3.13 in Azure
 - Azure Functions Core Tools v4
 
 ## Prerequisites
@@ -143,7 +145,7 @@ Open `function_app.py` and examine the code:
 import azure.functions as func
 import logging
 
-app = func.FunctionApp()
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 @app.function_name(name="HttpTrigger1")
 @app.route(route="hello")
@@ -170,7 +172,10 @@ def test_function(req: func.HttpRequest) -> func.HttpResponse:
         )
 ```
 
+The `function_app.py` in this folder also contains the AI agent function from Part 5 (`AgentTrigger`); you can ignore it until then.
+
 **Key concepts:**
+- `http_auth_level=func.AuthLevel.ANONYMOUS` - by default anyone can call the functions, without a key
 - `@app.route(route="hello")` - Function responds to `/api/hello` endpoint
 - `req.params.get('name')` - Get query parameter from URL
 - `req.get_json()` - Get JSON body from POST request
@@ -289,9 +294,9 @@ You can create the Function App either through VS Code or Azure Cloud Shell.
 1. Press `Ctrl+Shift+P` to open Command Palette
 2. Type "Azure Functions: Create Function App in Azure (Advanced)"
 3. Enter a **globally unique name** for your Function App (e.g., `func-yourname-12345`)
-4. Select **Python 3.10** or **Python 3.11** runtime
-5. Select **Linux** as the OS
-6. Select **Consumption** plan (pay-per-execution)
+4. Select **Flex Consumption** plan (pay-per-execution, the recommended serverless plan)
+5. Select **Python 3.13** runtime
+6. Keep the default instance memory (2048 MB)
 7. Select **UK South** (or your allowed region)
 8. Create new resource group: `myResourceGroupFunctions`
 9. Create new Storage Account (accept default name)
@@ -338,11 +343,9 @@ az functionapp create \
   --resource-group $RESOURCE_GROUP \
   --name $FUNCTION_APP_NAME \
   --storage-account $STORAGE_ACCOUNT \
-  --consumption-plan-location $LOCATION \
+  --flexconsumption-location $LOCATION \
   --runtime python \
-  --runtime-version 3.10 \
-  --functions-version 4 \
-  --os-type Linux
+  --runtime-version 3.13
 ```
 
 **Option B: Using PowerShell**
@@ -380,11 +383,9 @@ az functionapp create `
   --resource-group $RESOURCE_GROUP `
   --name $FUNCTION_APP_NAME `
   --storage-account $STORAGE_ACCOUNT `
-  --consumption-plan-location $LOCATION `
+  --flexconsumption-location $LOCATION `
   --runtime python `
-  --runtime-version 3.10 `
-  --functions-version 4 `
-  --os-type Linux
+  --runtime-version 3.13
 ```
 
 ### Step 11: Deploy Your Function Code to Azure
@@ -541,6 +542,273 @@ Deploy and test to see the new greeting message.
 
 ---
 
+## Part 5: Build an AI Agent with Azure OpenAI in Foundry
+
+An **AI agent** is a program in which a language model decides which actions to take. Here the model answers questions about IoT devices, such as "Is any device too hot?". It doesn't know the readings itself, so it asks your code to run **tools** - ordinary Python functions - and uses their results in the answer.
+
+The model comes from **Azure OpenAI in Microsoft Foundry Models** (a `gpt-5.4-mini` deployment). Every question costs a fraction of a cent; it is paid from your Azure credit.
+
+**The agent loop** (in `ask_agent()` in `function_app.py`):
+1. Send the question and the list of tools to the model
+2. If the model asks for a tool (`tool_calls` in the answer), run it and send the result back
+3. Repeat until the model answers with text - or stop after 5 model calls (`MAX_STEPS`), so a confused model can't run (and cost) forever
+
+**The files:**
+- `sensor_tools.py` - the tools: `list_devices` and `get_sensor_reading` return simulated data for three devices, with a description and a JSON schema of the input for the model. `run_tool()` checks the input the model sends, because the model's output is untrusted. The AWS version of this exercise uses the same file
+- `function_app.py` - the `AgentTrigger` function (`POST /api/agent`) runs the loop with the `openai` Python package. Unlike `hello`, it needs a **function key** (`auth_level=func.AuthLevel.FUNCTION`), so nobody else can spend your credit
+
+### Step 17: Create a Foundry Resource and Deploy a Model
+
+In **Azure Cloud Shell**:
+
+**Option A: Using Bash (recommended)**
+
+Set environment variables:
+```bash
+RESOURCE_GROUP="myResourceGroupFunctions"
+```
+```bash
+LOCATION="uksouth"  # Change to your allowed region
+```
+```bash
+AI_NAME="ai-iot-agent-$(openssl rand -hex 3)"  # Must be globally unique
+```
+```bash
+MODEL_DEPLOYMENT="gpt-5.4-mini"
+```
+
+Create the Foundry resource (it takes 1-2 minutes):
+```bash
+az cognitiveservices account create \
+  --name $AI_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --location $LOCATION \
+  --kind AIServices \
+  --sku S0 \
+  --custom-domain $AI_NAME \
+  --yes
+```
+
+Deploy the model (capacity 10 = 10,000 tokens per minute):
+```bash
+az cognitiveservices account deployment create \
+  --name $AI_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --deployment-name $MODEL_DEPLOYMENT \
+  --model-name gpt-5.4-mini \
+  --model-version 2026-03-17 \
+  --model-format OpenAI \
+  --sku-name GlobalStandard \
+  --sku-capacity 10
+```
+
+Show the endpoint and the key, and save them for the next steps:
+```bash
+az cognitiveservices account show --name $AI_NAME --resource-group $RESOURCE_GROUP --query properties.endpoint --output tsv
+```
+```bash
+az cognitiveservices account keys list --name $AI_NAME --resource-group $RESOURCE_GROUP --query key1 --output tsv
+```
+
+**Option B: Using PowerShell**
+
+Set environment variables (PowerShell syntax):
+```powershell
+$RESOURCE_GROUP="myResourceGroupFunctions"
+```
+```powershell
+$LOCATION="uksouth"  # Change to your allowed region
+```
+```powershell
+$AI_NAME="ai-iot-agent-$(Get-Random -Minimum 100000 -Maximum 999999)"  # Must be globally unique
+```
+```powershell
+$MODEL_DEPLOYMENT="gpt-5.4-mini"
+```
+
+Create the Foundry resource (it takes 1-2 minutes):
+```powershell
+az cognitiveservices account create `
+  --name $AI_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --location $LOCATION `
+  --kind AIServices `
+  --sku S0 `
+  --custom-domain $AI_NAME `
+  --yes
+```
+
+Deploy the model (capacity 10 = 10,000 tokens per minute):
+```powershell
+az cognitiveservices account deployment create `
+  --name $AI_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --deployment-name $MODEL_DEPLOYMENT `
+  --model-name gpt-5.4-mini `
+  --model-version 2026-03-17 `
+  --model-format OpenAI `
+  --sku-name GlobalStandard `
+  --sku-capacity 10
+```
+
+Show the endpoint and the key, and save them for the next steps:
+```powershell
+az cognitiveservices account show --name $AI_NAME --resource-group $RESOURCE_GROUP --query properties.endpoint --output tsv
+```
+```powershell
+az cognitiveservices account keys list --name $AI_NAME --resource-group $RESOURCE_GROUP --query key1 --output tsv
+```
+
+**Important:** The key works like a password. Don't share it and don't write it into files that you commit to git.
+
+If `gpt-5.4-mini` isn't available in your region, list the models you can deploy and pick another small one (for example `gpt-5-mini`), with its version:
+```bash
+az cognitiveservices model list --location $LOCATION --query "[?kind=='OpenAI' && contains(model.name,'mini')].{name:model.name,version:model.version}" --output table
+```
+
+### Step 18: Look at the Agent Code
+
+Open `function_app.py` and find `ask_agent()`:
+- `OpenAI(base_url=<endpoint>/openai/v1/, api_key=<key>)` - the `openai` package talks to Azure OpenAI through its OpenAI-compatible v1 API
+- `tools = [{"type": "function", "function": tool} for tool in TOOLS]` - the tools from `sensor_tools.py` in the format of the Chat Completions API
+- `client.chat.completions.create(..., tools=tools, max_completion_tokens=500)` - one model call; always limit the length of the answer
+- `message.tool_calls` - the tools the model wants to run. Each result goes back as a message with `"role": "tool"`
+
+The answer of the function contains the model's `answer` and the `steps` - every tool the model called, with its input and result - so you can see how the agent worked.
+
+### Step 19: Test the Agent Locally
+
+Install the new dependency (`openai`) in your virtual environment:
+```bash
+pip install -r requirements.txt
+```
+
+Set the connection details as environment variables in the terminal where you will run `func start` (the Functions runtime passes them to your code). Use the endpoint and the key from Step 17:
+
+**macOS/Linux:**
+```bash
+export AZURE_OPENAI_ENDPOINT="https://ai-iot-agent-<id>.cognitiveservices.azure.com/"
+export AZURE_OPENAI_API_KEY="<your-key>"
+export AZURE_OPENAI_DEPLOYMENT="gpt-5.4-mini"
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:AZURE_OPENAI_ENDPOINT="https://ai-iot-agent-<id>.cognitiveservices.azure.com/"
+$env:AZURE_OPENAI_API_KEY="<your-key>"
+$env:AZURE_OPENAI_DEPLOYMENT="gpt-5.4-mini"
+```
+
+Start the functions:
+```bash
+func start
+```
+
+You should see both functions:
+```
+Functions:
+        AgentTrigger: [POST] http://localhost:7071/api/agent
+        HttpTrigger1:  http://localhost:7071/api/hello
+```
+
+Ask the agent a question (in a second terminal). Locally no function key is needed:
+
+**macOS/Linux:**
+```bash
+curl -X POST http://localhost:7071/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Is any device too hot?"}'
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:7071/api/agent -ContentType "application/json" -Body '{"question": "Is any device too hot?"}' | ConvertTo-Json -Depth 5
+```
+
+You should get an answer like this (the readings are random, so the numbers differ):
+```json
+{
+  "answer": "Yes - device-02 in the Greenhouse is too hot: 31.7°C exceeds its max of 30.0°C.",
+  "steps": [
+    {"tool": "list_devices", "input": {}, "result": {"devices": [...]}},
+    {"tool": "get_sensor_reading", "input": {"device_id": "device-01"}, "result": {...}},
+    {"tool": "get_sensor_reading", "input": {"device_id": "device-02"}, "result": {...}},
+    {"tool": "get_sensor_reading", "input": {"device_id": "device-03"}, "result": {...}}
+  ]
+}
+```
+
+Look at the `steps`: the model first listed the devices, then asked for the reading of each one, and only then answered. Try other questions, for example `"What is the humidity in the warehouse?"` or `"Is device-99 OK?"` (an unknown device - watch how the model reacts to the tool's error message). The terminal with `func start` logs every tool call.
+
+If the function answers `Missing settings: ...`, the environment variables aren't set in the terminal where `func start` runs.
+
+### Step 20: Deploy the Agent to Azure
+
+In **Azure Cloud Shell**, add the connection details as **application settings** of your Function App (in the same session as Step 17; set `FUNCTION_APP_NAME` again if needed).
+
+**Option A: Using Bash (recommended)**
+```bash
+FUNCTION_APP_NAME="func-yourname-12345"  # Your Function App name from Step 10
+```
+```bash
+az functionapp config appsettings set \
+  --resource-group $RESOURCE_GROUP \
+  --name $FUNCTION_APP_NAME \
+  --settings \
+    AZURE_OPENAI_ENDPOINT=$(az cognitiveservices account show --name $AI_NAME --resource-group $RESOURCE_GROUP --query properties.endpoint --output tsv) \
+    AZURE_OPENAI_API_KEY=$(az cognitiveservices account keys list --name $AI_NAME --resource-group $RESOURCE_GROUP --query key1 --output tsv) \
+    AZURE_OPENAI_DEPLOYMENT=$MODEL_DEPLOYMENT \
+  --output none
+```
+
+**Option B: Using PowerShell**
+```powershell
+$FUNCTION_APP_NAME="func-yourname-12345"  # Your Function App name from Step 10
+```
+```powershell
+$AI_ENDPOINT=$(az cognitiveservices account show --name $AI_NAME --resource-group $RESOURCE_GROUP --query properties.endpoint --output tsv)
+$AI_KEY=$(az cognitiveservices account keys list --name $AI_NAME --resource-group $RESOURCE_GROUP --query key1 --output tsv)
+az functionapp config appsettings set `
+  --resource-group $RESOURCE_GROUP `
+  --name $FUNCTION_APP_NAME `
+  --settings AZURE_OPENAI_ENDPOINT=$AI_ENDPOINT AZURE_OPENAI_API_KEY=$AI_KEY AZURE_OPENAI_DEPLOYMENT=$MODEL_DEPLOYMENT `
+  --output none
+```
+
+Deploy the code again from your computer, as in Step 11:
+```bash
+func azure functionapp publish func-yourname-12345
+```
+
+Get the function key of the agent (the same in Bash and PowerShell):
+```bash
+az functionapp function keys list --resource-group $RESOURCE_GROUP --name $FUNCTION_APP_NAME --function-name AgentTrigger --query default --output tsv
+```
+
+Ask the deployed agent - without the key Azure answers `401 Unauthorized`, with the key (`?code=<key>`) you get the answer:
+
+**macOS/Linux:**
+```bash
+curl -X POST "https://func-yourname-12345.azurewebsites.net/api/agent?code=<function-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Is any device too hot?"}'
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://func-yourname-12345.azurewebsites.net/api/agent?code=<function-key>" -ContentType "application/json" -Body '{"question": "Is any device too hot?"}' | ConvertTo-Json -Depth 5
+```
+
+The tool calls appear in the logs of the function (Step 14).
+
+### Step 21: Explore and Extend the Agent
+
+1. In the [Foundry portal](https://ai.azure.com), open your resource → **Models + endpoints** → `gpt-5.4-mini` → **Metrics**: the requests and the tokens your agent used
+2. Change `SYSTEM_PROMPT` in `sensor_tools.py`, for example tell the model to answer in Polish, and test it locally again
+3. Add a third tool: write a function in `sensor_tools.py` (for example `get_devices_by_location(location)`), add its definition to `TOOLS` and a branch in `run_tool()`. Then ask a question that needs it - the model finds the new tool from its description
+
+---
+
 ## Cleanup
 
 **Don't forget to delete your resources to avoid charges!**
@@ -564,6 +832,11 @@ az group delete --name myResourceGroupFunctions --yes --no-wait
 **Using PowerShell:**
 ```powershell
 az group delete --name myResourceGroupFunctions --yes --no-wait
+```
+
+Deleting the resource group also deletes the Foundry resource from Part 5, but Azure keeps it **soft-deleted** for 48 hours (and you can't reuse its name). Purge it to remove it completely (the same in Bash and PowerShell; use your resource's name):
+```bash
+az cognitiveservices account purge --name ai-iot-agent-<id> --resource-group myResourceGroupFunctions --location uksouth
 ```
 
 **Option 3: Delete via VS Code**
@@ -605,7 +878,7 @@ az group delete --name myResourceGroupFunctions --yes --no-wait
 **Solutions:**
 - Check Application Insights logs in Azure Portal
 - Ensure all dependencies are in `requirements.txt`
-- Check Python runtime version matches (3.10 or 3.11)
+- Check the Python runtime version of the Function App (3.13)
 - Look for environment-specific issues (file paths, environment variables)
 - Enable streaming logs and make a test request
 
@@ -641,6 +914,7 @@ Congratulations! You've created and deployed a serverless function. You learned:
 ✅ **Deployment**: Publishing functions to Azure Cloud
 ✅ **Monitoring**: Viewing logs and Application Insights
 ✅ **Configuration**: Using environment variables and app settings
+✅ **AI Agents**: A tool-use loop with Azure OpenAI in Foundry, protected by a function key
 
 ### Key Azure Functions Concepts
 
@@ -657,7 +931,8 @@ Congratulations! You've created and deployed a serverless function. You learned:
 - Examples: Cosmos DB, Blob Storage, Service Bus
 
 **Hosting Plans**:
-- **Consumption**: Pay per execution, auto-scale (what we used)
+- **Flex Consumption**: Pay per execution, auto-scale (what we used)
+- **Consumption**: The older serverless plan (Linux Consumption is retired on September 30, 2028)
 - **Premium**: Pre-warmed instances, VNet integration
 - **Dedicated**: Run on App Service plan
 
