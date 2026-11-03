@@ -360,7 +360,7 @@ This is the AWS version of the [Azure Container Instance task](../readme.md). It
          --query "Subnets[0].SubnetId" \
          --output text)
    ```
-   7. Run the container on Fargate with a public IP address, and save the task's ARN to the terminal environmental variable `TASK_ARN`
+   7. Run the container on Fargate with a public IP address, and save the task's ARN to the terminal environmental variable `TASK_ARN`. If it fails with `Unable to assume the service linked role`, ECS is still creating its service-linked role on first use: wait 10 seconds and try again
    ```bash
       TASK_ARN=$(aws ecs run-task \
          --region $REGION \
@@ -480,7 +480,7 @@ This is the AWS version of the [Azure Container Instance task](../readme.md). It
          --query "Subnets[0].SubnetId" `
          --output text)
    ```
-   7. Run the container on Fargate with a public IP address, and save the task's ARN to the terminal environmental variable `TASK_ARN`
+   7. Run the container on Fargate with a public IP address, and save the task's ARN to the terminal environmental variable `TASK_ARN`. If it fails with `Unable to assume the service linked role`, ECS is still creating its service-linked role on first use: wait 10 seconds and try again
    ```powershell
       $TASK_ARN=$(aws ecs run-task `
          --region $REGION `
