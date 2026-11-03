@@ -17,7 +17,7 @@ This course provides an in-depth understanding of IoT and Cloud Computing using 
 
 ## Azure or AWS
 
-Every exercise is written for **Azure**. Exercises that also have an **AWS** version keep it in an `aws/` subfolder (for example [2-iaas/aws](2-iaas/aws/readme.md)), linked at the top of the Azure readme. The AWS versions use a personal AWS account and only Free Tier eligible services - see [1-cloud-account/aws](1-cloud-account/aws/readme.md) to set one up.
+Every exercise is written for **Azure**. Exercises that also have an **AWS** version keep it in an `aws/` subfolder (for example [2-iaas/aws](2-iaas/aws/readme.md)), linked at the top of the Azure readme. The AWS versions are written for a personal AWS account and use Free Tier eligible services where possible; an AWS Academy Learner Lab account also works, with the limits listed in [1-cloud-account/aws](1-cloud-account/aws/readme.md), which explains how to set up either one.
 
 Exercises with an AWS version:
 - 1 - Cloud account
