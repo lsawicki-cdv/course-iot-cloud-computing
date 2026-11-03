@@ -71,6 +71,7 @@ App Runner builds the app from a GitHub repository, so you need a GitHub account
    - `runtime: python311` - the managed Python 3.11 runtime
    - `pip3 install -r requirements.txt` - installs Flask and gunicorn (in the build and again before the app starts, because the Python 3.11 runtime doesn't keep packages installed during the build)
    - `gunicorn --bind 0.0.0.0:8080 app:app` - starts the `app` object from `app.py` on port 8080
+   - `PYTHONUNBUFFERED=1` - makes Python write the `print` messages to the logs straight away, instead of keeping them in a buffer
 3. Create the App Runner service in the AWS Console: https://console.aws.amazon.com/apprunner/home#/create
    1. Region: Europe (London) (or another region), selected in the top-right corner of the Console
    2. Repository type: Source code repository, Provider: GitHub
@@ -170,9 +171,9 @@ App Runner builds the app from a GitHub repository, so you need a GitHub account
    ```bash
    eb init flask-webapp --platform python-3.11 --region eu-west-2
    ```
-   6. Create an environment and deploy the app. `--single` creates one virtual machine without a load balancer, which keeps it in the Free Tier. It takes about 5 minutes
+   6. Create an environment and deploy the app. `--single` creates one virtual machine without a load balancer, which keeps it in the Free Tier. `PYTHONUNBUFFERED=1` makes Python write the `print` messages to the log straight away, instead of keeping them in a buffer. It takes about 5 minutes
    ```bash
-   eb create flask-webapp-env --single --instance_type t3.micro
+   eb create flask-webapp-env --single --instance_type t3.micro --envvars PYTHONUNBUFFERED=1
    ```
    7. Show the environment's status. The `CNAME` line is the app's address
    ```bash

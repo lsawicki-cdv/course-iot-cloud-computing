@@ -22,7 +22,8 @@ echo "web: gunicorn app:app" > Procfile
 eb init $APP_NAME --platform python-3.11 --region $REGION
 
 # Create an environment with a single VM (no load balancer) and deploy the app
-eb create $ENV_NAME --single --instance_type $SIZE
+# PYTHONUNBUFFERED=1 writes the print messages to the log straight away
+eb create $ENV_NAME --single --instance_type $SIZE --envvars PYTHONUNBUFFERED=1
 
 # Get the URL of the app
 APP_URL=$(eb status | grep CNAME | awk '{print $2}')

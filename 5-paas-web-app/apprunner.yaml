@@ -10,5 +10,8 @@ run:
   pre-run:
     - pip3 install -r requirements.txt
   command: gunicorn --bind 0.0.0.0:8080 app:app
+  env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
   network:
     port: 8080
