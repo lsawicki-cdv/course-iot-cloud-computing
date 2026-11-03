@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   mqtt-broker:
     image: eclipse-mosquitto:latest

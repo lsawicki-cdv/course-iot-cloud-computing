@@ -57,6 +57,8 @@ def simulate_device():
 
     print("Connecting MQTT broker")
     client.connect(mqtt_hub_hostname, port=mqtt_hub_port)
+    # Start the network loop in the background: it handles the connection, acknowledgements and callbacks
+    client.loop_start()
 
     print("Connected to MQTT broker")
 

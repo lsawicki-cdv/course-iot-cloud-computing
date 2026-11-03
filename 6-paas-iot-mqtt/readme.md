@@ -64,6 +64,8 @@ python simple_mqtt_device_simulator.py
 
 You should see connection logs in the terminal. Look for the MQTT topic name in the output.
 
+If the simulator can't connect (`Network is unreachable` or a timeout), the public test server may be down. Use another public test server instead: set `mqtt_hub_hostname = "broker.hivemq.com"` in the simulator, and connect the web client in the next step to `broker.hivemq.com`.
+
 ### Step 7: Verify Your Messages
 
 1. Open [MQTT Test Client](https://testclient-cloud.mqtt.cool/) in your web browser
@@ -239,8 +241,6 @@ nano docker-compose.yml
 
 Copy and paste this content, then save (press `Ctrl+X`, then `Y`, then `Enter`):
 ```yaml
-version: "3.8"
-
 services:
   mqtt-broker:
     image: eclipse-mosquitto:latest
