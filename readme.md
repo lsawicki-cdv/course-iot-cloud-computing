@@ -24,6 +24,7 @@ Exercises with an AWS version:
 - 2 - IaaS (Virtual Machine / EC2)
 - 3 - IaaS scale set (Virtual Machine Scale Set / Auto Scaling group)
 - 4 - Containers (Container Instances / ECS on Fargate)
+- 5 - PaaS web app (App Service / App Runner or Elastic Beanstalk)
 
 ## Remote development over SSH using Visual Studio Code
 
