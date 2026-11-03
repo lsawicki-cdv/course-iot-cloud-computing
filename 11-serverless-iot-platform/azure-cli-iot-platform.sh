@@ -23,7 +23,7 @@ az iot hub device-identity create --hub-name $IOT_HUB_NAME --device-id $IOT_DEVI
 # Get SAS token for the IoT Hub
 az iot hub generate-sas-token --hub-name $IOT_HUB_NAME --device-id $IOT_DEVICE_NAME --output table
 
-# TODO: Update and run MQTT device simulator from 6-paas-iot-hub
+# TODO: Update and run MQTT device simulator from 6-paas-iot-mqtt
 
 # Create a Cosmos DB account
 az cosmosdb create --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --locations regionName=$LOCATION --enable-free-tier true --default-consistency-level "Session"

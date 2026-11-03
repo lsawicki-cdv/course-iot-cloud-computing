@@ -172,7 +172,7 @@ We'll reuse the MQTT device simulator from Exercise 6.
 
 **On your local machine**, navigate to Exercise 6:
 ```bash
-cd 6-paas-iot-hub
+cd 6-paas-iot-mqtt
 ```
 
 If you haven't already, create a virtual environment and install dependencies:

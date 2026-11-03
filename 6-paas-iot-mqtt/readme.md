@@ -1,5 +1,7 @@
 ## Azure IoT Hub - MQTT Device Simulator Exercise
 
+> Using AWS instead? Follow the [AWS version of this exercise](aws/readme.md).
+
 In this exercise, you will learn how to send data from IoT devices to the cloud using MQTT protocol. You'll progress through three stages:
 1. **Testing locally** with a public MQTT test server
 2. **Running your own MQTT broker** on an Azure Virtual Machine
@@ -21,7 +23,7 @@ Make sure you have installed:
 ### Step 2: Setup Your Development Environment
 
 1. Clone this repository to your computer
-2. Open VS Code and navigate to this directory: `6-paas-iot-hub`
+2. Open VS Code and navigate to this directory: `6-paas-iot-mqtt`
 3. Open the integrated terminal in VS Code
 
 ### Step 3: Create Python Virtual Environment

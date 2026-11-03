@@ -1,0 +1,3 @@
+# Device certificate and private key downloaded from AWS IoT Core
+*.pem.crt
+*.pem.key
