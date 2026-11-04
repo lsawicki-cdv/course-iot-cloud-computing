@@ -30,7 +30,7 @@ cat > policy.json << EOF
 EOF
 aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://policy.json
 
-# Upload the files from the website directory (run from the 8-storage-blob directory)
+# Upload the files from the website directory (run from the 8-storage-static-website directory)
 aws s3 sync ./website s3://$BUCKET_NAME
 
 # Get the static website URL (some older regions, e.g. us-east-1, us-west-2 and eu-west-1, use "s3-website-$REGION" instead)
