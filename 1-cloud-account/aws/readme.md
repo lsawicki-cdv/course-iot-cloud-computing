@@ -4,7 +4,7 @@ This is the AWS version of [Get the Azure subscription for students](../readme.m
 
 #### Option A: Personal AWS account (recommended)
 
-**Credit card required!!!** New accounts get Free Tier credits, and the AWS exercises in this course stay within the Free Tier (or warn you where they don't), but you pay for anything above it.
+**Credit card not required!!!** New accounts get Free Tier credits, and the AWS exercises in this course stay within the Free Tier (or warn you where they don't), but you pay for anything above it.
 
 1. Sign up at: https://aws.amazon.com/free
 2. Sign in to the AWS Console as the root user
