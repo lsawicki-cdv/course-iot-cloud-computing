@@ -160,14 +160,14 @@ def create_items(container):
     # As your app evolves, let's say your object has a new schema. You can insert SalesOrderV2 objects without any
     # changes to the database tier.
     # Generate a random sales order ID
-    sales_order_id = f"SalesOrder{random.randint(2, 100)}"
+    sales_order_id = f"SalesOrder{random.randint(2, 99999)}"
     print(f"Creating a sales order with ID {sales_order_id}")
     sales_order2 = get_sales_order_v2(sales_order_id)
     container.create_item(body=sales_order2)
 
     # As your app evolves, let's say your object has a new schema. You can insert SalesOrderV2 objects without any
     # changes to the database tier.
-    sales_order_id = f"SalesOrder{random.randint(2, 100)}"
+    sales_order_id = f"SalesOrder{random.randint(2, 99999)}"
     print(f"Creating a sales order with ID {sales_order_id}")
     sales_order3 = get_sales_order(sales_order_id)
     container.create_item(body=sales_order3)

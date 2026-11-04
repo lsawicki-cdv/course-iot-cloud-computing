@@ -2,7 +2,7 @@
 
 # Variables
 RESOURCE_GROUP="myResourceGroupCosmosDb"
-COSMOS_DB_ACCOUNT="my-cosmos-super-db"
+COSMOS_DB_ACCOUNT="my-cosmos-super-db-$RANDOM"
 DATABASE_NAME="my-super-database"
 CONTAINER_NAME="my-super-container"
 LOCATION="uksouth"
