@@ -28,8 +28,8 @@ az postgres flexible-server create \
 # Allow connections from your computer
 az postgres flexible-server firewall-rule create \
   --resource-group $RESOURCE_GROUP \
-  --name $SERVER_NAME \
-  --rule-name allow-my-ip \
+  --server-name $SERVER_NAME \
+  --name allow-my-ip \
   --start-ip-address $MY_IP \
   --end-ip-address $MY_IP
 
@@ -37,7 +37,7 @@ az postgres flexible-server firewall-rule create \
 az postgres flexible-server db create \
   --resource-group $RESOURCE_GROUP \
   --server-name $SERVER_NAME \
-  --database-name $DATABASE_NAME
+  --name $DATABASE_NAME
 
 # Connect with psql
 psql "host=$SERVER_NAME.postgres.database.azure.com port=5432 dbname=$DATABASE_NAME user=$ADMIN_USER sslmode=require"

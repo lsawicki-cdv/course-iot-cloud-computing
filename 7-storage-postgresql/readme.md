@@ -74,8 +74,8 @@ Azure Cloud Shell (Bash and PowerShell)
    ```bash
       az postgres flexible-server firewall-rule create \
          --resource-group $RESOURCE_GROUP \
-         --name $SERVER_NAME \
-         --rule-name allow-my-ip \
+         --server-name $SERVER_NAME \
+         --name allow-my-ip \
          --start-ip-address $MY_IP \
          --end-ip-address $MY_IP
    ```
@@ -84,7 +84,7 @@ Azure Cloud Shell (Bash and PowerShell)
       az postgres flexible-server db create \
          --resource-group $RESOURCE_GROUP \
          --server-name $SERVER_NAME \
-         --database-name $DATABASE_NAME
+         --name $DATABASE_NAME
    ```
    6. Show the server's hostname. Save it - you'll need it later
    ```bash
@@ -141,8 +141,8 @@ Azure Cloud Shell (Bash and PowerShell)
    ```powershell
       az postgres flexible-server firewall-rule create `
          --resource-group $RESOURCE_GROUP `
-         --name $SERVER_NAME `
-         --rule-name allow-my-ip `
+         --server-name $SERVER_NAME `
+         --name allow-my-ip `
          --start-ip-address $MY_IP `
          --end-ip-address $MY_IP
    ```
@@ -151,7 +151,7 @@ Azure Cloud Shell (Bash and PowerShell)
       az postgres flexible-server db create `
          --resource-group $RESOURCE_GROUP `
          --server-name $SERVER_NAME `
-         --database-name $DATABASE_NAME
+         --name $DATABASE_NAME
    ```
    6. Show the server's hostname. Save it - you'll need it later
    ```powershell
