@@ -73,3 +73,8 @@ az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --resourc
 
 # Create a Function App for the IoT Platform API (Python)
 az functionapp create --resource-group $RESOURCE_GROUP --consumption-plan-location $LOCATION --name $FUNCTION_APP_NAME --storage-account $STORAGE_ACCOUNT_NAME --runtime python --functions-version 4 --runtime-version 3.12 --os-type Linux
+
+# Add the Cosmos DB endpoint and key to the app settings (read by the functions as environment variables)
+COSMOS_DB_ENDPOINT=$(az cosmosdb show --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --query "documentEndpoint" --output tsv)
+COSMOS_DB_KEY=$(az cosmosdb keys list --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --type keys --query "primaryMasterKey" --output tsv)
+az functionapp config appsettings set --name $FUNCTION_APP_NAME --resource-group $RESOURCE_GROUP --settings COSMOS_ENDPOINT=$COSMOS_DB_ENDPOINT COSMOS_KEY=$COSMOS_DB_KEY

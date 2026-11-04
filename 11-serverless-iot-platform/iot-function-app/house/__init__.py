@@ -1,13 +1,14 @@
 import logging
+import os
 
 from azure.cosmos import CosmosClient, exceptions
 from azure.functions import HttpRequest, HttpResponse
 import json
 
-# Initialize the Cosmos client
-endpoint = "https://cosmos-db-account-iot-platform.documents.azure.com:443/"
-# Replace with your Cosmos DB key, place in Azure Key Vault in production
-key = "<master_key>"
+# Initialize the Cosmos client with the endpoint and the key from the app settings
+# (COSMOS_ENDPOINT and COSMOS_KEY), so the key is not in the code. In production: Azure Key Vault
+endpoint = os.environ["COSMOS_ENDPOINT"]
+key = os.environ["COSMOS_KEY"]
 client = CosmosClient(endpoint, key)
 
 # Define the database and container
@@ -24,9 +25,11 @@ def main(req: HttpRequest) -> HttpResponse:
             house_id = req.params.get('house_id')
 
             # Query the container
-            query = f'SELECT * FROM c WHERE c.id = "{house_id}"'
+            # The value is passed as a parameter, never pasted into the query text (no SQL injection)
+            query = 'SELECT * FROM c WHERE c.id = @house_id'
             items = list(container.query_items(
                 query=query,
+                parameters=[{"name": "@house_id", "value": house_id}],
                 enable_cross_partition_query=True
             ))
 
@@ -99,6 +102,12 @@ def main(req: HttpRequest) -> HttpResponse:
                     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",  # Allow methods
                     "Access-Control-Allow-Headers": "Content-Type"  # Allow headers
                 },
+                mimetype='application/json'
+            )
+        except exceptions.CosmosResourceExistsError:
+            return HttpResponse(
+                json.dumps({'error': 'A house with this id already exists'}),
+                status_code=409,
                 mimetype='application/json'
             )
         except exceptions.CosmosHttpResponseError as e:

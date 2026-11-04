@@ -1,5 +1,7 @@
 # Serverless IoT Platform
 
+> Using AWS instead? Follow the [AWS version of this exercise](aws/readme.md).
+
 In this exercise, you'll build a complete serverless IoT platform combining four Azure services. You'll create an end-to-end system where IoT devices send telemetry data that flows through Azure services and can be queried via a REST API.
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
@@ -64,9 +66,9 @@ Set the Azure region (change if needed):
 LOCATION="uksouth"
 ```
 
-Set the IoT Hub name (**must be globally unique** - change this!):
+Set the IoT Hub name (**must be globally unique** - the random number takes care of that):
 ```bash
-IOT_HUB_NAME="cdv-iot-platform-hub-12345"
+IOT_HUB_NAME="cdv-iot-platform-hub-$RANDOM"
 ```
 
 Set your device name:
@@ -90,6 +92,11 @@ az iot hub create \
 ```
 
 **Important:** Save your IoT Hub name - you'll need it throughout this exercise!
+```bash
+echo $IOT_HUB_NAME
+```
+
+The free tier (F1) allows one IoT Hub per subscription. If the command fails because a free hub already exists, delete the old one (for example from exercise 6) or use `--sku S1` (paid).
 
 **Create device identity:**
 ```bash
@@ -122,9 +129,9 @@ Set the Azure region (change if needed):
 $LOCATION="uksouth"
 ```
 
-Set the IoT Hub name (**must be globally unique** - change this!):
+Set the IoT Hub name (**must be globally unique** - the random number takes care of that):
 ```powershell
-$IOT_HUB_NAME="cdv-iot-platform-hub-12345"
+$IOT_HUB_NAME="cdv-iot-platform-hub-$(Get-Random -Maximum 99999)"
 ```
 
 Set your device name:
@@ -148,6 +155,11 @@ az iot hub create `
 ```
 
 **Important:** Save your IoT Hub name - you'll need it throughout this exercise!
+```powershell
+$IOT_HUB_NAME
+```
+
+The free tier (F1) allows one IoT Hub per subscription. If the command fails because a free hub already exists, delete the old one (for example from exercise 6) or use `--sku S1` (paid).
 
 **Create device identity:**
 ```powershell
@@ -258,7 +270,7 @@ Go back to **Azure Cloud Shell**.
 
 **Set the Cosmos DB account name (must be globally unique):**
 ```bash
-COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-12345"
+COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-$RANDOM"
 ```
 
 Set the database name:
@@ -266,7 +278,7 @@ Set the database name:
 COSMOS_DB_DATABASE_NAME="iot-platform-database"
 ```
 
-**Create Cosmos DB account (this takes 3-5 minutes):**
+**Create Cosmos DB account (this takes 2-5 minutes).** Only one account per subscription can use the free tier: if the command fails because the free tier is already used, delete your old Cosmos DB account (for example from exercise 9) first:
 ```bash
 az cosmosdb create \
   --name $COSMOS_DB_ACCOUNT_NAME \
@@ -340,7 +352,7 @@ az cosmosdb keys list \
 
 **Set the Cosmos DB account name (must be globally unique):**
 ```powershell
-$COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-12345"
+$COSMOS_DB_ACCOUNT_NAME="cosmos-iot-platform-$(Get-Random -Maximum 99999)"
 ```
 
 Set the database name:
@@ -348,7 +360,7 @@ Set the database name:
 $COSMOS_DB_DATABASE_NAME="iot-platform-database"
 ```
 
-**Create Cosmos DB account (this takes 3-5 minutes):**
+**Create Cosmos DB account (this takes 2-5 minutes).** Only one account per subscription can use the free tier: if the command fails because the free tier is already used, delete your old Cosmos DB account (for example from exercise 9) first:
 ```powershell
 az cosmosdb create `
   --name $COSMOS_DB_ACCOUNT_NAME `
@@ -423,6 +435,8 @@ az cosmosdb keys list `
 ## Part 3: Create Azure Stream Analytics Job
 
 Stream Analytics will read data from IoT Hub, transform it, and write it to Cosmos DB in real-time.
+
+**Cost:** Stream Analytics has no free tier. A running job costs about $0.11 per hour for each streaming unit (UK South) - about $80 per month for one unit. Use 1 streaming unit (Query → **Scale**, or the job's **Scale** page), and stop the job or delete the resource group when you finish.
 
 ### Step 4: Create Stream Analytics Job
 
@@ -543,12 +557,12 @@ Now we'll create a serverless REST API using Azure Functions to query and manage
 
 **Set the Function App name (must be globally unique):**
 ```bash
-FUNCTION_APP_NAME="cdv-iot-platform-func-12345"
+FUNCTION_APP_NAME="cdv-iot-platform-func-$RANDOM"
 ```
 
 Set the storage account name (must be globally unique, lowercase, no hyphens):
 ```bash
-STORAGE_ACCOUNT_NAME="iotfuncstorage12345"
+STORAGE_ACCOUNT_NAME="iotfuncstorage$RANDOM"
 ```
 
 **Create Storage Account (required for Functions):**
@@ -569,9 +583,11 @@ az functionapp create \
   --storage-account $STORAGE_ACCOUNT_NAME \
   --runtime python \
   --functions-version 4 \
-  --runtime-version 3.11 \
+  --runtime-version 3.12 \
   --os-type Linux
 ```
+
+Python 3.12 is the newest version the Linux Consumption plan supports. The plan reaches end of life on 30 September 2028 (the command warns about it); [exercise 10](../10-faas-functions/readme.md) uses its successor, Flex Consumption.
 
 **Important:** Save your Function App name and URL:
 ```bash
@@ -583,12 +599,12 @@ echo "Your Function App URL: https://$FUNCTION_APP_NAME.azurewebsites.net"
 
 **Set the Function App name (must be globally unique):**
 ```powershell
-$FUNCTION_APP_NAME="cdv-iot-platform-func-12345"
+$FUNCTION_APP_NAME="cdv-iot-platform-func-$(Get-Random -Maximum 99999)"
 ```
 
 Set the storage account name (must be globally unique, lowercase, no hyphens):
 ```powershell
-$STORAGE_ACCOUNT_NAME="iotfuncstorage12345"
+$STORAGE_ACCOUNT_NAME="iotfuncstorage$(Get-Random -Maximum 99999)"
 ```
 
 **Create Storage Account (required for Functions):**
@@ -609,7 +625,7 @@ az functionapp create `
   --storage-account $STORAGE_ACCOUNT_NAME `
   --runtime python `
   --functions-version 4 `
-  --runtime-version 3.11 `
+  --runtime-version 3.12 `
   --os-type Linux
 ```
 
@@ -619,34 +635,54 @@ echo "Your Function App name: $FUNCTION_APP_NAME"
 echo "Your Function App URL: https://$FUNCTION_APP_NAME.azurewebsites.net"
 ```
 
-### Step 9: Update Function Code with Cosmos DB Credentials
+### Step 9: Add the Cosmos DB Credentials to the App Settings
+
+The functions read the Cosmos DB endpoint and key from the **app settings** `COSMOS_ENDPOINT` and `COSMOS_KEY` (environment variables of the Function App), so the key is never written in the code or committed to git. Open `device/__init__.py` to see how:
+```python
+endpoint = os.environ["COSMOS_ENDPOINT"]
+key = os.environ["COSMOS_KEY"]
+```
+
+In **Azure Cloud Shell**:
+
+**Option A: Using Bash (recommended)**
+
+```bash
+COSMOS_DB_ENDPOINT=$(az cosmosdb show --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --query "documentEndpoint" --output tsv)
+```
+```bash
+COSMOS_DB_KEY=$(az cosmosdb keys list --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --type keys --query "primaryMasterKey" --output tsv)
+```
+```bash
+az functionapp config appsettings set \
+  --name $FUNCTION_APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --settings COSMOS_ENDPOINT=$COSMOS_DB_ENDPOINT COSMOS_KEY=$COSMOS_DB_KEY
+```
+
+**Option B: Using PowerShell**
+
+```powershell
+$COSMOS_DB_ENDPOINT=$(az cosmosdb show --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --query "documentEndpoint" --output tsv)
+```
+```powershell
+$COSMOS_DB_KEY=$(az cosmosdb keys list --name $COSMOS_DB_ACCOUNT_NAME --resource-group $RESOURCE_GROUP --type keys --query "primaryMasterKey" --output tsv)
+```
+```powershell
+az functionapp config appsettings set `
+  --name $FUNCTION_APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --settings COSMOS_ENDPOINT=$COSMOS_DB_ENDPOINT COSMOS_KEY=$COSMOS_DB_KEY
+```
+
+You can see the settings in the Azure Portal: your Function App → **Settings** → **Environment variables**.
+
+### Step 10: Deploy Functions to Azure
 
 **On your local machine**, navigate to the function app directory:
 ```bash
 cd 11-serverless-iot-platform/iot-function-app
 ```
-
-**Update each function with your Cosmos DB credentials:**
-
-Open `device/__init__.py` and update lines 8-10:
-```python
-endpoint = "https://cosmos-iot-platform-12345.documents.azure.com:443/"  # Your Cosmos DB endpoint
-key = "your-cosmos-db-primary-key-here"  # Your Cosmos DB primary key
-```
-
-Open `house/__init__.py` and update lines 8-10:
-```python
-endpoint = "https://cosmos-iot-platform-12345.documents.azure.com:443/"  # Your Cosmos DB endpoint
-key = "your-cosmos-db-primary-key-here"  # Your Cosmos DB primary key
-```
-
-Open `rooms/__init__.py` and update lines 8-10:
-```python
-endpoint = "https://cosmos-iot-platform-12345.documents.azure.com:443/"  # Your Cosmos DB endpoint
-key = "your-cosmos-db-primary-key-here"  # Your Cosmos DB primary key
-```
-
-### Step 10: Deploy Functions to Azure
 
 **Create Python virtual environment:**
 
@@ -667,10 +703,12 @@ py -m venv .venv
 pip install -r requirements.txt
 ```
 
-**Deploy to Azure:**
+**Deploy to Azure** (use your Function App name; `--python` tells the tool the language of the project):
 ```bash
-func azure functionapp publish $FUNCTION_APP_NAME
+func azure functionapp publish <your-function-app-name> --python
 ```
+
+The tool may warn that your local Python version is different from the one of the Function App. That's fine: the dependencies are installed in Azure (remote build).
 
 Wait for deployment to complete (this takes 2-3 minutes). You should see output like:
 ```
@@ -785,6 +823,8 @@ Open **Postman** and create the following requests:
 }
 ```
 
+Send the same request again: you get `409 Conflict`, because a house with this `id` already exists.
+
 #### 3. GET House Data
 
 Test that the house was created successfully.
@@ -872,7 +912,7 @@ If you want to visualize the data in a web interface, see [FRONTEND_DEPLOYMENT_S
 
 ### Function returns 500 Internal Server Error
 - **Check Function logs:** Azure Portal → Your Function App → Log stream
-- **Verify Cosmos DB credentials:** Ensure endpoint and key are correct in all three function files
+- **Verify Cosmos DB credentials:** Check the app settings `COSMOS_ENDPOINT` and `COSMOS_KEY` (Step 9) in your Function App → Settings → Environment variables
 - **Check container names:** Ensure `iot-data`, `house-data`, and `room-data` containers exist
 - **Test Cosmos DB connection:** Use Data Explorer in Azure Portal to manually query containers
 

@@ -1,13 +1,14 @@
 import logging
+import os
 from azure.cosmos import CosmosClient, exceptions
 
 import azure.functions as func
 import json
 
-# Initialize the Cosmos client
-endpoint = "https://cosmos-db-account-iot-platform.documents.azure.com:443/"
-# Replace with your Cosmos DB key, place in Azure Key Vault in production
-key = "<master_key>"
+# Initialize the Cosmos client with the endpoint and the key from the app settings
+# (COSMOS_ENDPOINT and COSMOS_KEY), so the key is not in the code. In production: Azure Key Vault
+endpoint = os.environ["COSMOS_ENDPOINT"]
+key = os.environ["COSMOS_KEY"]
 client = CosmosClient(endpoint, key)
 
 # Define the database and container
@@ -29,10 +30,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         # Query the container
-        query = f'SELECT * FROM c WHERE c.deviceid = "{device_id}"'
-        logging.info(query)
+        # The value is passed as a parameter, never pasted into the query text (no SQL injection)
+        query = 'SELECT * FROM c WHERE c.deviceid = @device_id'
+        logging.info(f'{query} (device_id={device_id})')
         items = list(container.query_items(
             query=query,
+            parameters=[{"name": "@device_id", "value": device_id}],
             enable_cross_partition_query=True
         ))
 

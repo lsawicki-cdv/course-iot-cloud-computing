@@ -25,4 +25,4 @@ func init --python
 func start 
 
 # Deploy the Function App code
-func azure functionapp publish $FUNCTION_APP_NAME
+func azure functionapp publish $FUNCTION_APP_NAME --python

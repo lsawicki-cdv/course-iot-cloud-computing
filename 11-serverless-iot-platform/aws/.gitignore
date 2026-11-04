@@ -1,0 +1,6 @@
+# Files created by aws-cli-iot-platform.sh
+*.pem.crt
+*.pem.key
+*.zip
+*-policy.json
+iot-rule.json

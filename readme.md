@@ -31,6 +31,7 @@ Exercises with an AWS version:
 - 8 - Static website (Blob Storage / Amazon S3)
 - 9 - NoSQL database (Cosmos DB / Amazon DynamoDB)
 - 10 - Serverless functions and an AI agent (Azure Functions + Azure OpenAI in Foundry / AWS Lambda + Amazon Bedrock)
+- 11 - Serverless IoT platform (IoT Hub + Stream Analytics + Cosmos DB + Functions / IoT Core + IoT rule + DynamoDB + Lambda + API Gateway)
 
 ## Remote development over SSH using Visual Studio Code
 
