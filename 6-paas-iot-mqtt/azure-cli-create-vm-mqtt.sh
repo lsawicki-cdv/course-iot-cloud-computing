@@ -4,7 +4,7 @@
 RESOURCE_GROUP="myResourceGroupVMForDocker"
 LOCATION="uksouth"
 VM_NAME="my-vm-mqtt-docker"
-IMAGE="Ubuntu2204"
+IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
 SIZE="Standard_B1s"
 
 # Create a resource group

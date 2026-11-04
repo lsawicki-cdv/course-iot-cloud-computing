@@ -9,7 +9,7 @@ Check your allowed regions here: https://portal.azure.com/#view/Microsoft_Azure_
 1. Create Azure Virtual Machine from Azure Portal: https://portal.azure.com/#create/Microsoft.VirtualMachine-ARM
    1. Create resource group if you don't have any
    2. Region: UK South (or your allowed region based on Policy)
-   3. Image: Ubuntu 22.04
+   3. Image: Ubuntu 26.04
    4. Size: B1s (free)
    5. Allow port 22
    6. Click "Review+Create"
@@ -48,7 +48,7 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
    VM_NAME="my-vm"
    ```
    ```bash
-   IMAGE="Ubuntu2204"
+   IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```bash
    SIZE="Standard_B1s"
@@ -121,7 +121,7 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
    $VM_NAME="my-vm"
    ```
    ```powershell
-   $IMAGE="Ubuntu2204"
+   $IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```powershell
    $SIZE="Standard_B1s"

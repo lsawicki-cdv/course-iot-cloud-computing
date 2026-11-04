@@ -25,7 +25,7 @@ This is the AWS version of the [Azure Container Instance task](../readme.md). It
       VM_NAME="my-vm-docker"
    ```
    ```bash
-      IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+      IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```bash
       SIZE="t3.micro"
@@ -114,7 +114,7 @@ This is the AWS version of the [Azure Container Instance task](../readme.md). It
       $VM_NAME="my-vm-docker"
    ```
    ```powershell
-      $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+      $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```powershell
       $SIZE="t3.micro"
@@ -203,7 +203,7 @@ This is the AWS version of the [Azure Container Instance task](../readme.md). It
    ```
    3. Copy the following content to the terminal and save it on the virtual machine
    ```
-      ARG UBUNTU_VERSION=22.04
+      ARG UBUNTU_VERSION=26.04
       FROM ubuntu:${UBUNTU_VERSION} AS base
 
       # OS dependencies and packages

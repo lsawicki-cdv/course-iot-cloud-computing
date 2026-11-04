@@ -39,7 +39,7 @@ Resource Group
   ├── Network Interface
   ├── Storage Account (boot diagnostics)
   ├── SSH Key Pair (auto-generated)
-  └── Linux Virtual Machine (Ubuntu 22.04)
+  └── Linux Virtual Machine (Ubuntu 26.04)
       └── Custom Script Extension (nginx installation)
 ```
 
@@ -56,7 +56,7 @@ Resource Group
 
 ## Tested Environments
 
-- Ubuntu 22.04
+- Ubuntu 26.04
 - Terraform v1.11.0
 - Azure Cloud Shell (Bash)
 
@@ -315,8 +315,8 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-26_04-lts"
+    sku       = "server"
     version   = "latest"
   }
 
@@ -340,7 +340,7 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
 - Creates 10 Azure resources in a specific order
 - Uses `random_pet` to generate unique resource group name
 - Defines networking (VNet, subnet, public IP, NSG)
-- Creates VM with Ubuntu 22.04 LTS
+- Creates VM with Ubuntu 26.04 LTS
 - Configures SSH key authentication
 - Sets up boot diagnostics for troubleshooting
 

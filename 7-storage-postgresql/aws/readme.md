@@ -32,8 +32,8 @@ In exercise 9 you will use a NoSQL database that stores JSON documents without a
 - **SSL/TLS** - RDS for PostgreSQL requires encrypted connections (`sslmode=require`)
 
 ### Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 26.04
+Python 3.10+
 AWS CloudShell (Bash and PowerShell)
 
 ### Steps

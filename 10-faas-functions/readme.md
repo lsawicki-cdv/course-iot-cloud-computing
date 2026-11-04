@@ -26,7 +26,7 @@ In this exercise, you will learn how to create and deploy serverless functions u
 
 ## Tested Environments
 
-- Ubuntu 22.04 / 24.04
+- Ubuntu 24.04 / 26.04
 - Python 3.10+ locally, Python 3.13 in Azure
 - Azure Functions Core Tools v4
 

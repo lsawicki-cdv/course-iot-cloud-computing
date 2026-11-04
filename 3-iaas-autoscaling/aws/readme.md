@@ -25,7 +25,7 @@ This is the AWS version of the [Azure Virtual Machine Scale Set task](../readme.
       SCALE_SET_NAME="my-scale-set"
    ```
    ```bash
-      IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+      IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```bash
       SIZE="t3.micro"
@@ -173,7 +173,7 @@ This is the AWS version of the [Azure Virtual Machine Scale Set task](../readme.
       $SCALE_SET_NAME="my-scale-set"
    ```
    ```powershell
-      $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+      $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```powershell
       $SIZE="t3.micro"
@@ -335,7 +335,7 @@ This is the AWS version of the [Azure Virtual Machine Scale Set task](../readme.
    1. Region: Europe (London) (or another region), selected in the top-right corner of the Console
    2. Go to EC2 → Launch Templates → "Create launch template"
       1. Name: `my-scale-set-template`
-      2. Image (AMI): Ubuntu Server 22.04 LTS
+      2. Image (AMI): Ubuntu Server 26.04 LTS
       3. Instance type: t3.micro
       4. Key pair: Don't include in launch template (we will connect using EC2 Instance Connect)
       5. Network settings: create a security group that allows SSH traffic (port 22) from anywhere

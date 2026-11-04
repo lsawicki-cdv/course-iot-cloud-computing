@@ -40,7 +40,7 @@ Validating a change usually means deploying to a real Azure subscription; there 
 ## Conventions for exercise content
 
 - Audience is students on **Azure for Students** subscriptions, which restrict deployments to ~5 allowed regions. Every readme starts with the "Important: check your Policy assignments…" note; defaults use **UK South** (`uksouth`). Keep that note and default when adding exercises.
-- Readmes target Ubuntu 22.04/24.04 and Python 3.10+, and list a "Tested Environments" section.
+- Readmes target Ubuntu 24.04/26.04 and Python 3.10+, and list a "Tested Environments" section.
 - Shell steps are given for Azure Cloud Shell in two variants: **Option A: Bash (recommended)** and **Option B: PowerShell** (backtick line continuation). When changing a command in a readme, update both variants.
 - `az` CLI scripts follow the same pattern: `#!/bin/bash`, a `# Variables` block of UPPER_CASE names, then commented `az` steps.
 - Resource names in Bicep/Terraform are often made globally unique with a random/`uniqueString` suffix; keep that when adding resources such as storage accounts or IoT Hubs.

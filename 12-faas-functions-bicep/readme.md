@@ -43,7 +43,7 @@ Resource Group
 
 ## Tested Environments
 
-- Ubuntu 22.04/24.04
+- Ubuntu 24.04/26.04
 - Azure CLI 2.50+
 - Bicep CLI (included with Azure CLI)
 

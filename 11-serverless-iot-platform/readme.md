@@ -29,8 +29,8 @@ Client (Postman / Frontend)
 - How to test REST APIs using Postman
 
 ## Tested Environments
-- Ubuntu 22.04/24.04
-- Python 3.10.12+
+- Ubuntu 24.04/26.04
+- Python 3.10+
 - Azure Functions Core Tools v4
 
 ## Prerequisites

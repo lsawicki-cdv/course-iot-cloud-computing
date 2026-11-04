@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Cloud-init script to install Docker and Docker Compose on Ubuntu 22.04
+# Cloud-init script to install Docker and Docker Compose on Ubuntu 26.04
 # This script runs automatically when the VM is first created
 #
 

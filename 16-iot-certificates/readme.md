@@ -10,8 +10,8 @@
 - Understand the difference between self-signed and CA-signed certificates
 
 ### Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 26.04
+Python 3.10+
 
 ### Background
 

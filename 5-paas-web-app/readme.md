@@ -19,8 +19,8 @@ The app is the Flask sample from the Microsoft quickstart [Deploy a Python (Djan
 - **Build on deployment** - App Service (its build system, Oryx) detects `requirements.txt`, installs the packages, finds `app.py` and starts it with gunicorn. You don't write a startup command
 
 ### Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 26.04
+Python 3.10+
 Azure Cloud Shell (Bash and PowerShell)
 
 ### Steps

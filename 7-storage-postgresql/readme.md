@@ -19,8 +19,8 @@ In exercise 9 you will use Cosmos DB, a NoSQL database that stores JSON document
 - **SSL/TLS** - the server only accepts encrypted connections (`sslmode=require`)
 
 ### Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 26.04
+Python 3.10+
 Azure Cloud Shell (Bash and PowerShell)
 
 ### Steps

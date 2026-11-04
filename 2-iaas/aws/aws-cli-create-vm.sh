@@ -4,7 +4,7 @@
 REGION="eu-west-2"
 VM_NAME="my-vm"
 SECURITY_GROUP_NAME="my-vm-sg"
-IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 SIZE="t3.micro"
 
 # Download the nginx installation script (passed to the VM as user data)

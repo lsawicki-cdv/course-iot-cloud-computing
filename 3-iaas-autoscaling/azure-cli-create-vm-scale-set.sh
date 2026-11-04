@@ -4,7 +4,7 @@
 RESOURCE_GROUP="myResourceGroupScaleSet2"
 LOCATION="uksouth"
 SCALE_SET_NAME="myScaleSet2"
-IMAGE="Ubuntu2204"
+IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
 SIZE="Standard_B1s"
 
 # Create a resource group

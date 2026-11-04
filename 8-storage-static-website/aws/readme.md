@@ -23,7 +23,7 @@ This is the AWS version of the [Azure Blob Storage task](../readme.md). It hosts
 - **Website endpoint** - S3 website endpoints support only HTTP. For HTTPS, AWS puts Amazon CloudFront (a CDN) in front of the bucket, which is not part of this task
 
 ### Tested environments
-Ubuntu 22.04
+Ubuntu 26.04
 AWS CloudShell (Bash and PowerShell)
 
 ### Steps

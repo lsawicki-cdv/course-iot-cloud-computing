@@ -19,7 +19,7 @@
       SCALE_SET_NAME="myScaleSet2"
    ```
    ```bash
-      IMAGE="Ubuntu2204"
+      IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```bash
       SIZE="Standard_B1s"
@@ -93,7 +93,7 @@
       $SCALE_SET_NAME="myScaleSet2"
    ```
    ```powershell
-      $IMAGE="Ubuntu2204"
+      $IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```powershell
       $SIZE="Standard_B1s"
@@ -160,7 +160,7 @@
    2. Create Azure Virtual machine Scale Set
    3. Region: UK South (or your allowed region based on Policy)
    4. Instance count: 2
-   5. Image: Ubuntu 22.04
+   5. Image: Ubuntu 26.04
    6. Size: B1s (free)
    7. Allow port 22
    8. Click "Review+Create"

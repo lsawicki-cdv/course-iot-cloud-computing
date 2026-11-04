@@ -18,7 +18,7 @@
       VM_NAME="my-vm-mqtt-docker"
    ```
    ```bash
-      IMAGE="Ubuntu2204"
+      IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```bash
       SIZE="Standard_B1s"
@@ -81,7 +81,7 @@
       $VM_NAME="my-vm-mqtt-docker"
    ```
    ```powershell
-      $IMAGE="Ubuntu2204"
+      $IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
    ```
    ```powershell
       $SIZE="Standard_B1s"
@@ -139,7 +139,7 @@
    ```
    2. Copy the following content to the terminal and save it on the virtual machine
    ```
-      ARG UBUNTU_VERSION=22.04
+      ARG UBUNTU_VERSION=26.04
       FROM ubuntu:${UBUNTU_VERSION} AS base
 
       # OS dependencies and packages

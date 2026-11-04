@@ -46,9 +46,9 @@ Azure Blob Storage (stores telemetry as JSON files)
 
 ## Tested Environments
 
-- Ubuntu 22.04/24.04
+- Ubuntu 24.04/26.04
 - Terraform v1.11.0
-- Python 3.10.12+
+- Python 3.10+
 - Azure Cloud Shell (Bash)
 
 ## Prerequisites

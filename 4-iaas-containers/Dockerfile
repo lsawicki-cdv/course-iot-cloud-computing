@@ -1,4 +1,4 @@
-ARG UBUNTU_VERSION=22.04
+ARG UBUNTU_VERSION=26.04
 FROM ubuntu:${UBUNTU_VERSION} AS base
 
 # OS dependencies and packages

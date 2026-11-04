@@ -10,8 +10,8 @@ In this exercise, you will learn how to send data from IoT devices to the cloud 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
 ## Tested Environments
-- Ubuntu 22.04
-- Python 3.10.12
+- Ubuntu 26.04
+- Python 3.10+
 
 ## Part 1: Setup and Test with Public MQTT Server
 ### Step 1: Install Prerequisites
@@ -106,7 +106,7 @@ VM_NAME="my-vm-mqtt-docker"
 
 Set the VM image:
 ```bash
-IMAGE="Ubuntu2204"
+IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
 ```
 
 Set the VM size:
@@ -176,7 +176,7 @@ $VM_NAME="my-vm-mqtt-docker"
 
 Set the VM image:
 ```powershell
-$IMAGE="Ubuntu2204"
+$IMAGE="Canonical:ubuntu-26_04-lts:server:latest"
 ```
 
 Set the VM size:

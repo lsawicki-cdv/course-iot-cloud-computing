@@ -12,10 +12,10 @@
 - Run databases in Docker containers
 
 ### Tested environments
-Ubuntu 22.04
+Ubuntu 26.04
 Terraform v1.11.0
 Docker 24.0+
-Python 3.10.12
+Python 3.10+
 
 ### Background
 

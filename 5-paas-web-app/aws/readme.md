@@ -35,8 +35,8 @@ The app is the same Flask sample as in the Azure version:
 - **Elastic Beanstalk application and environment** - the application holds the uploaded versions of your code; an environment runs one version on EC2 virtual machines (here a single one, without a load balancer) behind an nginx proxy
 
 ### Tested environments
-Ubuntu 22.04
-Python 3.10.12
+Ubuntu 26.04
+Python 3.10+
 AWS CloudShell (Bash and PowerShell)
 
 ### Steps

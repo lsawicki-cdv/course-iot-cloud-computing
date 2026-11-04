@@ -37,8 +37,8 @@ In this exercise, messages with the custom property `level="storage"` are routed
 
 ## Tested Environments
 
-- Ubuntu 22.04
-- Python 3.10.12+
+- Ubuntu 26.04
+- Python 3.10+
 - Azure CLI 2.50+
 - Bicep CLI (included with Azure CLI)
 

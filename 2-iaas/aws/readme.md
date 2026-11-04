@@ -16,7 +16,7 @@ This is the AWS version of the [Azure Virtual Machine task](../readme.md). It us
 1. Create an EC2 instance from the AWS Console: https://console.aws.amazon.com/ec2/home#LaunchInstances:
    1. Region: Europe (London) (or your allowed region), selected in the top-right corner of the Console
    2. Name: `my-vm`
-   3. Image (AMI): Ubuntu Server 22.04 LTS
+   3. Image (AMI): Ubuntu Server 26.04 LTS
    4. Instance type: t3.micro (Free Tier eligible; use t2.micro if t3.micro isn't eligible in your region)
    5. Key pair: Proceed without a key pair (we will connect using EC2 Instance Connect)
    6. Network settings: Allow SSH traffic from Anywhere (port 22)
@@ -55,7 +55,7 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
    SECURITY_GROUP_NAME="my-vm-sg"
    ```
    ```bash
-   IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+   IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```bash
    SIZE="t3.micro"
@@ -142,7 +142,7 @@ echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.h
    $SECURITY_GROUP_NAME="my-vm-sg"
    ```
    ```powershell
-   $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+   $IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
    ```
    ```powershell
    $SIZE="t3.micro"

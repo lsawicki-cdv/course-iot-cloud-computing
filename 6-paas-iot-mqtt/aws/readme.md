@@ -20,8 +20,8 @@ This is the AWS version of the [Azure IoT Hub exercise](../readme.md). You will 
 **Important**: This guide uses **Europe (London)** (`eu-west-2`) as the default region. The EC2 instance (t3.micro) and AWS IoT Core are Free Tier eligible (IoT Core: 500,000 messages per month; the simulator sends one message every 10 seconds). Delete all resources at the end of the exercise.
 
 ## Tested Environments
-- Ubuntu 22.04
-- Python 3.10.12
+- Ubuntu 26.04
+- Python 3.10+
 
 ## Part 1: Setup and Test with Public MQTT Server
 ### Step 1: Install Prerequisites
@@ -109,9 +109,9 @@ Set the VM name:
 VM_NAME="my-vm-mqtt-docker"
 ```
 
-Set the VM image (Ubuntu 22.04):
+Set the VM image (Ubuntu 26.04):
 ```bash
-IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 ```
 
 Set the VM size:
@@ -196,9 +196,9 @@ Set the VM name:
 $VM_NAME="my-vm-mqtt-docker"
 ```
 
-Set the VM image (Ubuntu 22.04):
+Set the VM image (Ubuntu 26.04):
 ```powershell
-$IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+$IMAGE="resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 ```
 
 Set the VM size:
