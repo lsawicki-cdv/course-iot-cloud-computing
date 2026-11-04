@@ -2,7 +2,7 @@
 
 # Variables
 RESOURCE_GROUP_NAME="myResourceGroupFrontend"
-STORAGE_ACCOUNT_NAME="mystorageaccountfrontend"
+STORAGE_ACCOUNT_NAME="mystorageaccount$RANDOM"
 LOCATION="uksouth"
 
 # Create a resource group
@@ -14,7 +14,7 @@ az storage account create --name $STORAGE_ACCOUNT_NAME --location $LOCATION --re
 # Enable static website hosting
 az storage blob service-properties update --account-name $STORAGE_ACCOUNT_NAME --static-website --index-document index.html --404-document error.html
 
-# Upload files to the $web container
+# Upload files to the $web container (run from the 8-storage-blob directory)
 az storage blob upload-batch --destination \$web --source ./website --account-name $STORAGE_ACCOUNT_NAME
 
 # Get the static website URL

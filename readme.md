@@ -28,6 +28,7 @@ Exercises with an AWS version:
 - 5 - PaaS web app (App Service / App Runner or Elastic Beanstalk)
 - 6 - IoT over MQTT (IoT Hub / IoT Core)
 - 7 - PostgreSQL database (Azure Database for PostgreSQL / Amazon RDS)
+- 8 - Static website (Blob Storage / Amazon S3)
 - 10 - Serverless functions and an AI agent (Azure Functions + Azure OpenAI in Foundry / AWS Lambda + Amazon Bedrock)
 
 ## Remote development over SSH using Visual Studio Code
