@@ -1,46 +1,30 @@
 # Azure Virtual Machine with Terraform
 
+> Using AWS instead? Follow the [AWS version of this exercise](aws/readme.md).
+
 In this exercise, you'll learn **Terraform** - a popular multi-cloud Infrastructure as Code (IaC) tool. You'll deploy a complete Linux VM infrastructure on Azure, including networking, security, and automated web server installation.
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
-## What is Terraform?
-
-**Terraform** is an open-source Infrastructure as Code tool created by HashiCorp. It's:
-- **Cloud-agnostic** - Works with AWS, Azure, GCP, and 100+ other providers
-- **Declarative** - Describe what you want, Terraform figures out how to create it
-- **State-managed** - Tracks infrastructure state to detect and manage changes
-- **Widely adopted** - Industry standard for multi-cloud IaC
-
-### Terraform vs Bicep
-
-| Feature | Terraform | Bicep |
-|---------|-----------|-------|
-| Cloud Support | Multi-cloud (AWS, Azure, GCP, etc.) | Azure only |
-| Language | HCL (HashiCorp Configuration Language) | Bicep DSL |
-| State Management | Requires state file | Managed by Azure |
-| Maturity | Since 2014 (mature ecosystem) | Since 2021 (newer) |
-| Provider Ecosystem | 1000+ providers | Azure services only |
-| Learning Curve | Moderate | Easy (if Azure-focused) |
-
-Use **Bicep** if: You only work with Azure and want tight integration
-Use **Terraform** if: You work with multiple clouds or need provider flexibility
+**Read first:** [Terraform Basics](terraform-basics.md) - what Terraform is, how this exercise is organized, the workflow and the state. That page is shared with the AWS version; this readme contains only the Azure steps.
 
 ## Architecture Overview
 
 This Terraform configuration deploys a complete VM infrastructure:
 
 ```
-Resource Group
+Resource Group (rg-<random-name>)
   ├── Virtual Network (10.0.0.0/16)
   │   └── Subnet (10.0.1.0/24)
   ├── Public IP Address
-  ├── Network Security Group (SSH + HTTP rules)
+  ├── Network Security Group (SSH, + HTTP in Part 4)
   ├── Network Interface
-  ├── Storage Account (boot diagnostics)
-  ├── SSH Key Pair (auto-generated)
-  └── Linux Virtual Machine (Ubuntu 26.04)
-      └── Custom Script Extension (nginx installation)
+  └── Linux Virtual Machine (Ubuntu 26.04, Standard_B1s)
+      └── cloud-init script (nginx installation, Part 4)
+
+Shared with the AWS version:
+  ├── modules/ssh-key  (SSH key pair, private key saved to ssh-key.pem)
+  └── cloud-init.sh    (nginx installation)
 ```
 
 ### What You'll Learn
@@ -49,16 +33,15 @@ Resource Group
 - Terraform workflow: init → plan → apply → destroy
 - Azure VM infrastructure components and dependencies
 - Network security group configuration
-- Automated VM provisioning with custom scripts
-- SSH key-based authentication
+- Automated VM provisioning with cloud-init
+- SSH key-based authentication with a shared Terraform module
 - Terraform state management
 - Comparing Terraform with Bicep (Exercise 12-13)
 
 ## Tested Environments
 
-- Ubuntu 26.04
-- Terraform v1.11.0
 - Azure Cloud Shell (Bash)
+- Ubuntu 24.04/26.04, Terraform v1.16, azurerm provider 4.x
 
 ## Prerequisites
 
@@ -66,6 +49,8 @@ Before starting, ensure you have:
 - Azure account with active subscription
 - Basic Linux command line knowledge
 - Understanding of VMs and networking concepts (complete Exercise 2 first)
+
+The `Standard_B1s` size is in the Azure free services (750 hours per month for 12 months) and in the Azure for Students offer; the public IP address and the disk cost a few cents per day. Destroy everything at the end of the exercise.
 
 ---
 
@@ -75,7 +60,7 @@ Before starting, ensure you have:
 
 1. Navigate to the **Azure Portal** (portal.azure.com)
 2. Click the **Cloud Shell** icon (>_) in the top navigation bar
-3. Ensure you're using the **Bash** environment (not PowerShell)
+3. Use **Bash** (recommended) or **PowerShell** - all commands below work the same in both
 
 **Why Cloud Shell?** It has Terraform pre-installed and is already authenticated with your Azure subscription.
 
@@ -85,53 +70,33 @@ Before starting, ensure you have:
 terraform version
 ```
 
-You should see output like: `Terraform v1.11.0` or similar.
+You should see output like: `Terraform v1.16.1` or similar.
 
-### Step 2: Create Terraform Project Directory
+### Step 2: Get the Terraform Files
 
-**Create and navigate to project directory:**
+**Download the course repository and go to the exercise directory:**
 
 ```bash
-mkdir terraform-vm
-cd terraform-vm
+git clone --depth 1 https://github.com/lsawicki-cdv/course-iot-cloud-computing.git
+cd course-iot-cloud-computing/14-iaas-terraform
 ```
 
 ---
 
-## Part 2: Create Terraform Configuration Files
+## Part 2: Understand the Terraform Configuration
 
-Terraform uses multiple `.tf` files to organize configuration. You'll create 5 files:
+The Azure configuration has 5 files (see [How the Exercise is Organized](terraform-basics.md#how-the-exercise-is-organized)). Open them with `code <file>` (the Cloud Shell editor) or `cat <file>`.
 
-1. **providers.tf** - Configure Terraform and Azure provider
-2. **variables.tf** - Define input variables
-3. **main.tf** - Define resources to create
-4. **outputs.tf** - Define values to output after deployment
-5. **ssh.tf** - Generate SSH keys automatically
-
-### Step 3: Create providers.tf
-
-**Create the file:**
-
-```bash
-nano providers.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code providers.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
+### Step 3: providers.tf
 
 ```hcl
 terraform {
-  required_version = ">=0.12"
+  required_version = ">=1.5"
 
   required_providers {
-    azapi = {
-      source  = "azure/azapi"
-      version = "~>1.5"
-    }
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~>3.0"
+      version = "~>4.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -145,329 +110,66 @@ provider "azurerm" {
 }
 ```
 
-**Save and exit**: Press `Ctrl+X`, then `Y`, then `Enter`
+- `azurerm` - Main Azure provider for resources. It signs in with your Azure CLI login and uses the active subscription (`az account show`)
+- `random` - Generates random values for unique names
+- The `tls` and `local` providers come from the shared `ssh-key` module
 
-**What this does:**
-- Specifies minimum Terraform version (0.12+)
-- Declares three providers:
-  - `azurerm` - Main Azure provider for resources
-  - `azapi` - Azure API provider for advanced resources
-  - `random` - Generates random values for unique names
-- Configures the Azure provider
+### Step 4: variables.tf
 
-### Step 4: Create variables.tf
+Three input variables with default values: `resource_group_location` (`uksouth`), `resource_group_name_prefix` (`rg`) and `username` (`azureadmin`). Change the location here, or pass `-var resource_group_location=<region>` to `terraform plan`.
 
-**Create the file:**
+### Step 5: main.tf
 
-```bash
-nano variables.tf
-```
+`main.tf` creates 8 Azure resources:
 
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code variables.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```hcl
-variable "resource_group_location" {
-  type        = string
-  default     = "uksouth"
-  description = "Location of the resource group."
-}
-
-variable "resource_group_name_prefix" {
-  type        = string
-  default     = "rg"
-  description = "Prefix of the resource group name that's combined with a random ID so name is unique in your Azure subscription."
-}
-
-variable "username" {
-  type        = string
-  description = "The username for the local account that will be created on the new VM."
-  default     = "azureadmin"
-}
-```
-
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
-
-**What this does:**
-- Defines three input variables with default values
-- Variables make Terraform configuration reusable
-- You can override defaults when running `terraform apply`
-
-### Step 5: Create main.tf
-
-**Create the file:**
-
-```bash
-nano main.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code main.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```hcl
-resource "random_pet" "rg_name" {
-  prefix = var.resource_group_name_prefix
-}
-
-resource "azurerm_resource_group" "rg" {
-  location = var.resource_group_location
-  name     = random_pet.rg_name.id
-}
-
-# Create virtual network
-resource "azurerm_virtual_network" "my_terraform_network" {
-  name                = "myVnet"
-  address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-}
-
-# Create subnet
-resource "azurerm_subnet" "my_terraform_subnet" {
-  name                 = "mySubnet"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.my_terraform_network.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Create public IPs
-resource "azurerm_public_ip" "my_terraform_public_ip" {
-  name                = "myPublicIP"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-}
-
-# Create Network Security Group and rule
-resource "azurerm_network_security_group" "my_terraform_nsg" {
-  name                = "myNetworkSecurityGroup"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  security_rule {
-    name                       = "SSH"
-    priority                   = 1001
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-}
-
-# Create network interface
-resource "azurerm_network_interface" "my_terraform_nic" {
-  name                = "myNIC"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  ip_configuration {
-    name                          = "my_nic_configuration"
-    subnet_id                     = azurerm_subnet.my_terraform_subnet.id
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.my_terraform_public_ip.id
-  }
-}
-
-# Connect the security group to the network interface
-resource "azurerm_network_interface_security_group_association" "example" {
-  network_interface_id      = azurerm_network_interface.my_terraform_nic.id
-  network_security_group_id = azurerm_network_security_group.my_terraform_nsg.id
-}
-
-# Generate random text for a unique storage account name
-resource "random_id" "random_id" {
-  keepers = {
-    # Generate a new ID only when a new resource group is defined
-    resource_group = azurerm_resource_group.rg.name
-  }
-
-  byte_length = 8
-}
-
-# Create storage account for boot diagnostics
-resource "azurerm_storage_account" "my_storage_account" {
-  name                     = "diag${random_id.random_id.hex}"
-  location                 = azurerm_resource_group.rg.location
-  resource_group_name      = azurerm_resource_group.rg.name
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-}
-
-# Create virtual machine
-resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
-  name                  = "myVM"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  network_interface_ids = [azurerm_network_interface.my_terraform_nic.id]
-  size                  = "Standard_B1s"
-
-  os_disk {
-    name                 = "myOsDisk"
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "ubuntu-26_04-lts"
-    sku       = "server"
-    version   = "latest"
-  }
-
-  computer_name  = "hostname-terraform"
-  admin_username = var.username
-
-  admin_ssh_key {
-    username   = var.username
-    public_key = azapi_resource_action.ssh_public_key_gen.output.publicKey
-  }
-
-  boot_diagnostics {
-    storage_account_uri = azurerm_storage_account.my_storage_account.primary_blob_endpoint
-  }
-}
-```
-
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
-
-**What this does:**
-- Creates 10 Azure resources in a specific order
-- Uses `random_pet` to generate unique resource group name
-- Defines networking (VNet, subnet, public IP, NSG)
-- Creates VM with Ubuntu 26.04 LTS
-- Configures SSH key authentication
-- Sets up boot diagnostics for troubleshooting
+1. **random_pet + resource group** (lines 1-8): a resource group with a random name like `rg-adapting-redfish`
+2. **Virtual network and subnet** (lines 10-24): `10.0.0.0/16` and `10.0.1.0/24`
+3. **Public IP** (lines 26-33): a static Standard IP address
+4. **Network security group** (lines 35-52): allows SSH (port 22) from anywhere
+5. **Network interface + association** (lines 54-72): connects the VM to the subnet, the public IP and the security group
+6. **Virtual machine** (lines 74-105): Ubuntu 26.04, `Standard_B1s`, the SSH key from the module, boot diagnostics
 
 **Key Terraform concepts:**
-- `resource` blocks define what to create
+- References like `azurerm_resource_group.rg.name` create dependencies - Terraform creates the resource group first
 - `azurerm_` prefix indicates Azure resources
-- References like `azurerm_resource_group.rg.name` create dependencies
-- Terraform automatically determines creation order
+- `public_key = module.ssh_key.public_key_openssh` uses the output of the shared module
 
-### Step 6: Create outputs.tf
+### Step 6: outputs.tf and ssh.tf
 
-**Create the file:**
-
-```bash
-nano outputs.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code outputs.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```hcl
-output "resource_group_name" {
-  value = azurerm_resource_group.rg.name
-}
-
-output "public_ip_address" {
-  value = azurerm_linux_virtual_machine.my_terraform_vm.public_ip_address
-}
-```
-
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
-
-**What this does:**
-- Defines outputs displayed after `terraform apply`
-- Outputs are useful for getting IPs, names, connection strings
-- You can reference outputs in other Terraform modules
-
-### Step 7: Create ssh.tf
-
-**Create the file:**
-
-```bash
-nano ssh.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code ssh.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```hcl
-resource "random_pet" "ssh_key_name" {
-  prefix    = "ssh"
-  separator = ""
-}
-
-resource "azapi_resource_action" "ssh_public_key_gen" {
-  type        = "Microsoft.Compute/sshPublicKeys@2022-11-01"
-  resource_id = azapi_resource.ssh_public_key.id
-  action      = "generateKeyPair"
-  method      = "POST"
-
-  response_export_values = ["publicKey", "privateKey"]
-}
-
-resource "azapi_resource" "ssh_public_key" {
-  type      = "Microsoft.Compute/sshPublicKeys@2022-11-01"
-  name      = random_pet.ssh_key_name.id
-  location  = azurerm_resource_group.rg.location
-  parent_id = azurerm_resource_group.rg.id
-}
-
-output "key_data" {
-  value = azapi_resource_action.ssh_public_key_gen.output.publicKey
-}
-```
-
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
-
-**What this does:**
-- Automatically generates SSH key pair in Azure
-- No need to manually create or manage SSH keys
-- Public key is used by the VM (in main.tf)
-- Private key can be retrieved if needed for SSH access
+- `outputs.tf` returns the resource group name, the public IP address and a ready `ssh` command
+- `ssh.tf` calls the shared [SSH key module](terraform-basics.md#the-shared-ssh-key-module)
 
 ---
 
 ## Part 3: Deploy Infrastructure with Terraform
 
-### Step 8: Initialize Terraform
+What each command does is explained in [The Terraform Workflow](terraform-basics.md#the-terraform-workflow).
 
-**Run terraform init:**
+### Step 7: Initialize Terraform
 
 ```bash
 terraform init -upgrade
 ```
 
-**What this does:**
-- Downloads required provider plugins (azurerm, azapi, random)
-- Initializes the backend (where state is stored)
-- Validates configuration syntax
-- Creates `.terraform` directory and lock file
-
 **Expected output:**
 ```
 Initializing the backend...
+Initializing modules...
+- ssh_key in modules/ssh-key
 Initializing provider plugins...
-- Finding azure/azapi versions matching "~> 1.5"...
-- Finding hashicorp/azurerm versions matching "~> 3.0"...
-- Finding hashicorp/random versions matching "~> 3.0"...
+- Installed hashicorp/azurerm v4.81.0 (signed by HashiCorp)
+- Installed hashicorp/random v3.9.1 (signed by HashiCorp)
+- Installed hashicorp/tls v4.4.2 (signed by HashiCorp)
+- Installed hashicorp/local v2.9.1 (signed by HashiCorp)
 
 Terraform has been successfully initialized!
 ```
 
-### Step 9: Review the Execution Plan
-
-**Create an execution plan:**
+### Step 8: Review the Execution Plan
 
 ```bash
 terraform plan -out main.tfplan
 ```
-
-**What this does:**
-- Analyzes configuration files
-- Compares desired state with current state
-- Shows what will be created, modified, or destroyed
-- Saves plan to `main.tfplan` file
 
 **Expected output:**
 ```
@@ -480,102 +182,70 @@ Terraform will perform the following actions:
       ...
     }
 
-  # ... (10-12 more resources)
+  # ... (10 more resources)
 
-Plan: 12 to add, 0 to change, 0 to destroy.
+Plan: 11 to add, 0 to change, 0 to destroy.
 ```
 
 **Review the plan carefully!** Ensure the region is correct and resources match expectations.
 
-### Step 10: Apply the Configuration
-
-**Deploy the infrastructure:**
+### Step 9: Apply the Configuration
 
 ```bash
 terraform apply main.tfplan
 ```
 
-**Wait 3-5 minutes for deployment**. You'll see progress as each resource is created.
+**Wait about 2 minutes for deployment**. You'll see progress as each resource is created.
 
 **Expected output:**
 ```
 azurerm_resource_group.rg: Creating...
 azurerm_resource_group.rg: Creation complete after 2s
-azurerm_virtual_network.my_terraform_network: Creating...
 ...
-azurerm_linux_virtual_machine.my_terraform_vm: Still creating... [1m30s elapsed]
-azurerm_linux_virtual_machine.my_terraform_vm: Creation complete after 2m15s
+azurerm_linux_virtual_machine.my_terraform_vm: Creation complete after 51s
 
-Apply complete! Resources: 12 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 11 added, 0 changed, 0 destroyed.
 
 Outputs:
 
-public_ip_address = "20.123.45.67"
-resource_group_name = "rg-keen-tortoise"
+public_ip_address = "20.26.220.60"
+resource_group_name = "rg-adapting-redfish"
+ssh_command = "ssh -i ./ssh-key.pem azureadmin@20.26.220.60"
 ```
 
-**Important:** Save the **public_ip_address** - you'll need it later!
-
-### Step 11: Verify Deployment
+### Step 10: Verify Deployment
 
 **Check resources in Azure Portal:**
 
 1. Navigate to Azure Portal
-2. Find your resource group (e.g., `rg-keen-tortoise`)
-3. Verify all resources exist:
-   - Virtual Machine (myVM)
-   - Virtual Network (myVnet)
-   - Network Security Group (myNetworkSecurityGroup)
-   - Public IP (myPublicIP)
-   - Storage Account (diag...)
+2. Find your resource group (e.g., `rg-adapting-redfish`)
+3. Verify all resources exist: Virtual Machine (myVM), Virtual Network (myVnet), Network Security Group (myNetworkSecurityGroup), Public IP (myPublicIP), Network Interface (myNIC), Disk (myOsDisk)
 
 **Or verify via Azure CLI:**
 
-**Using Bash:**
 ```bash
 az vm list --resource-group $(terraform output -raw resource_group_name) --output table
 ```
 
-**Using PowerShell:**
-```powershell
-az vm list --resource-group $(terraform output -raw resource_group_name) --output table
+**Connect to the VM with SSH** (wait a minute after apply, until the VM has booted):
+
+```bash
+ssh -i ssh-key.pem azureadmin@$(terraform output -raw public_ip_address)
 ```
+
+Type `yes` to trust the VM, then `exit` to leave it.
 
 ---
 
 ## Part 4: Modify Configuration to Add HTTP Access
 
-Now you'll modify the Terraform configuration to allow HTTP traffic and install nginx web server.
+Now you'll modify the Terraform configuration to allow HTTP traffic and install the nginx web server with the shared `cloud-init.sh` script.
 
-### Step 12: Add HTTP Security Rule
+### Step 11: Add HTTP Security Rule
 
-**Edit main.tf:**
-
-```bash
-nano main.tf
-```
-
-**Find the Network Security Group section** (around line 35-50) and add a second `security_rule` block for HTTP:
+**Edit main.tf** (`code main.tf`). Find the Network Security Group (lines 35-52) and add a second `security_rule` block for HTTP after the SSH rule:
 
 ```hcl
-# Create Network Security Group and rule
-resource "azurerm_network_security_group" "my_terraform_nsg" {
-  name                = "myNetworkSecurityGroup"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  security_rule {
-    name                       = "SSH"
-    priority                   = 1001
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
   # Add this new security rule for HTTP
   security_rule {
     name                       = "HTTP"
@@ -588,71 +258,33 @@ resource "azurerm_network_security_group" "my_terraform_nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-}
 ```
 
-**Save**: `Ctrl+X`, `Y`, `Enter`
+### Step 12: Add the cloud-init Script to the VM
 
-### Step 13: Add Custom Script to Install Nginx
-
-**Still editing main.tf**, find the VM resource (around line 92-124) and add `custom_data` field:
+**Still editing main.tf**, find the VM resource (line 75) and add `custom_data` after `size`:
 
 ```hcl
 resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
-  name                  = "myVM"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  network_interface_ids = [azurerm_network_interface.my_terraform_nic.id]
+  ...
   size                  = "Standard_B1s"
 
   # Add this line to install nginx on first boot
-  custom_data = base64encode(file("${path.module}/cloud-init.txt"))
-
-  os_disk {
-    name                 = "myOsDisk"
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  # ... rest of configuration
+  custom_data = base64encode(file("${path.module}/cloud-init.sh"))
+  ...
 }
 ```
 
-**Save**: `Ctrl+X`, `Y`, `Enter`
+Azure expects `custom_data` base64-encoded. See [The Shared nginx Script](terraform-basics.md#the-shared-nginx-script) for what `cloud-init.sh` does.
 
-### Step 14: Create Cloud-Init Script
-
-**Create cloud-init.txt file:**
+**Save** the file (`Ctrl+S` in the editor) and check the syntax:
 
 ```bash
-nano cloud-init.txt
+terraform fmt
+terraform validate
 ```
 
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code cloud-init.txt` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```bash
-#!/bin/bash
-# Install and configure nginx web server
-sudo apt update -y
-sudo apt install nginx -y
-sudo systemctl start nginx
-sudo systemctl enable nginx
-echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.html
-```
-
-**Save**: `Ctrl+X`, `Y`, `Enter`
-
-**What this script does:**
-1. Updates package lists
-2. Installs nginx web server
-3. Starts and enables nginx service
-4. Creates a custom welcome page with hostname
-
-### Step 15: Apply the Changes
-
-**Create a new plan:**
+### Step 13: Apply the Changes
 
 ```bash
 terraform plan -out main.tfplan
@@ -660,43 +292,30 @@ terraform plan -out main.tfplan
 
 **Expected output:**
 ```
-Terraform will perform the following actions:
-
   # azurerm_linux_virtual_machine.my_terraform_vm must be replaced
 -/+ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
-      ~ custom_data = (known after apply)
-      # ... VM will be recreated with new custom_data
+      + custom_data = (sensitive value) # forces replacement
+      ...
 
   # azurerm_network_security_group.my_terraform_nsg will be updated in-place
   ~ resource "azurerm_network_security_group" "my_terraform_nsg" {
-      + security_rule {
-          + name = "HTTP"
-          ...
-        }
-    }
+      ~ security_rule = [
+          + {
+              + name = "HTTP"
+              ...
 
 Plan: 1 to add, 1 to change, 1 to destroy.
 ```
 
 **Important:** The VM will be **replaced** (destroyed and recreated) because `custom_data` can't be changed on existing VMs.
 
-**Apply the changes:**
-
 ```bash
 terraform apply main.tfplan
 ```
 
-Wait 3-5 minutes for the VM to be recreated and nginx to install.
+Wait about 2 minutes for the VM to be recreated, and 1-2 more minutes for nginx to install.
 
-### Step 16: Test the Web Server
-
-**Get the public IP address:**
-
-```bash
-terraform output public_ip_address
-```
-
-**Option 1: Test with curl (in Cloud Shell):**
+### Step 14: Test the Web Server
 
 ```bash
 curl http://$(terraform output -raw public_ip_address)
@@ -704,62 +323,33 @@ curl http://$(terraform output -raw public_ip_address)
 
 **Expected output:**
 ```html
-<h1>Hello World from hostname-terraform</h1>
+<h1>Hello World from hostname-terraform.0p1rrqeqomlupo2qawv2fbo5kg.zx.internal.cloudapp.net</h1>
 ```
 
-**Option 2: Test in web browser:**
-
-Open your browser and navigate to:
-```
-http://<your-public-ip-address>
-```
-
-You should see the welcome page!
+(`hostname -f` prints the full internal DNS name of the VM.) Or open `http://<your-public-ip-address>` in your browser.
 
 ---
 
 ## Part 5: Understanding Terraform State
 
-### Step 17: Explore Terraform State
+### Step 15: Explore Terraform State
 
-**View current state:**
+Run `terraform state list` and `terraform show` - see [Terraform State](terraform-basics.md#terraform-state).
 
-```bash
-terraform show
+**Expected output of `terraform state list`:**
 ```
-
-This displays all managed resources and their current attributes.
-
-**List resources in state:**
-
-```bash
-terraform state list
-```
-
-**Expected output:**
-```
-azapi_resource.ssh_public_key
-azapi_resource_action.ssh_public_key_gen
 azurerm_linux_virtual_machine.my_terraform_vm
 azurerm_network_interface.my_terraform_nic
 azurerm_network_interface_security_group_association.example
 azurerm_network_security_group.my_terraform_nsg
 azurerm_public_ip.my_terraform_public_ip
 azurerm_resource_group.rg
-azurerm_storage_account.my_storage_account
 azurerm_subnet.my_terraform_subnet
 azurerm_virtual_network.my_terraform_network
-random_id.random_id
 random_pet.rg_name
-random_pet.ssh_key_name
+module.ssh_key.local_sensitive_file.private_key
+module.ssh_key.tls_private_key.ssh
 ```
-
-**What is Terraform state?**
-- Tracks mapping between configuration and real resources
-- Stored in `terraform.tfstate` file
-- Contains resource IDs, attributes, metadata
-- **Important:** Never manually edit state file!
-- In production, store state remotely (Azure Storage, Terraform Cloud)
 
 ---
 
@@ -767,78 +357,42 @@ random_pet.ssh_key_name
 
 **Important:** Delete all resources to avoid ongoing charges!
 
-### Step 18: Destroy Infrastructure
-
-**Create destroy plan:**
+### Step 16: Destroy Infrastructure
 
 ```bash
 terraform plan -destroy -out main.destroy.tfplan
-```
-
-**Review the plan** - it shows what will be destroyed.
-
-**Apply the destroy plan:**
-
-```bash
 terraform apply main.destroy.tfplan
 ```
 
-Wait 2-3 minutes. All resources will be deleted.
+Wait about 2 minutes. All 11 resources are deleted, including the resource group and `ssh-key.pem`.
 
 **Verify cleanup:**
 
-**Using Bash:**
 ```bash
-az group list --output table | grep rg-
+az group list --query "[?starts_with(name, 'rg-')].name" --output table
 ```
 
-**Using PowerShell:**
-```powershell
-az group list --output table | grep rg-
-```
-
-The resource group should be gone.
+Your resource group should be gone.
 
 ---
 
 ## Troubleshooting
 
-### Terraform init fails with "could not query provider registry"
+The common Terraform problems (init, references, state, web server, SSH) are in [Common Troubleshooting](terraform-basics.md#common-troubleshooting). Azure-specific ones:
 
-- **Check internet connection**: Cloud Shell needs internet access
-- **Clear cache**: Delete `.terraform` directory and run `terraform init` again
-- **Update Terraform**: Run `terraform version` to check version
+### Plan or apply fails with "subscription ID could not be determined"
 
-### Plan shows "Error: Reference to undeclared resource"
+- **Sign in**: Run `az login` (not needed in Cloud Shell) and check `az account show`
+- **Pick the subscription**: Run `az account set --subscription <id>`, or `export ARM_SUBSCRIPTION_ID=<id>` (Bash) / `$env:ARM_SUBSCRIPTION_ID="<id>"` (PowerShell)
 
-- **Check resource names**: Ensure all references match resource names exactly
-- **Check file syntax**: Run `terraform validate` to check syntax
-- **Check dependencies**: Some resources need others to exist first
+### Apply fails with "SkuNotAvailable" or a quota error for the VM
 
-### Apply fails with "A resource with the ID already exists"
+- **Check the size in your region**: `az vm list-skus --location uksouth --size Standard_B1s --output table`
+- **Use another allowed region**: `terraform plan -var resource_group_location=<region> -out main.tfplan`
 
-- **Check state file**: You might have state conflicts
-- **Import existing resource**: Use `terraform import` if resource exists
-- **Delete and recreate**: Remove from state with `terraform state rm`
+### Apply fails with "RequestDisallowedByPolicy"
 
-### VM deployment takes too long or times out
-
-- **Check Azure region**: Some regions are slower than others
-- **Check quota**: You may have reached VM quota limit
-- **Retry**: Sometimes Azure has temporary issues, try again
-
-### Cannot access web server after deployment
-
-- **Wait 2-3 minutes**: Cloud-init script takes time to run
-- **Check public IP**: Use `terraform output public_ip_address`
-- **Check NSG rules**: Verify port 80 is open in Azure Portal
-- **Check nginx status**: SSH to VM and run `sudo systemctl status nginx`
-
-### "InvalidParameter" error for custom_data
-
-- **Check file exists**: Ensure `cloud-init.txt` is in the same directory
-- **Check base64encode**: Syntax must be `base64encode(file("${path.module}/cloud-init.txt"))`
-- **Check script format**: Ensure cloud-init.txt has Unix line endings (LF not CRLF)
+- **Your subscription doesn't allow the region**: Check the Policy assignments (see the note at the top) and use an allowed region
 
 ---
 
@@ -846,56 +400,28 @@ The resource group should be gone.
 
 Congratulations! You've deployed infrastructure using Terraform. You learned:
 
-✅ **Terraform Fundamentals**: HCL syntax, providers, resources, variables, outputs
+✅ **Terraform Fundamentals**: HCL syntax, providers, resources, variables, outputs, modules
 ✅ **Terraform Workflow**: init → plan → apply → destroy lifecycle
-✅ **Azure VM Infrastructure**: Networking, security, storage, compute
+✅ **Azure VM Infrastructure**: Networking, security, compute
 ✅ **Security Groups**: Opening specific ports (SSH, HTTP)
 ✅ **Cloud-Init**: Automated VM configuration on first boot
-✅ **SSH Key Management**: Auto-generated keys with azapi provider
+✅ **SSH Key Management**: Keys generated by a shared module
 ✅ **State Management**: Understanding terraform.tfstate
 ✅ **IaC Benefits**: Repeatable, version-controlled infrastructure
-
-### Terraform Key Concepts
-
-**Resources**: Building blocks of infrastructure
-```hcl
-resource "azurerm_virtual_machine" "example" {
-  name = "myVM"
-  ...
-}
-```
-
-**Variables**: Parameterize configuration
-```hcl
-variable "location" {
-  default = "uksouth"
-}
-```
-
-**Outputs**: Return values from deployment
-```hcl
-output "ip" {
-  value = azurerm_public_ip.example.ip_address
-}
-```
-
-**Dependencies**: Terraform automatically handles order
-- Implicit: References create dependencies
-- Explicit: Use `depends_on` when needed
 
 ### Terraform vs Bicep Comparison (Exercise 12 Revisited)
 
 **Terraform Advantages:**
-- Multi-cloud support (AWS, GCP, Azure, etc.)
+- Multi-cloud support (AWS, GCP, Azure, etc.) - compare with the [AWS version](aws/readme.md): same workflow, same module and script, different resources
 - Larger ecosystem and community
 - More providers (1000+)
-- More mature (10+ years)
+- `terraform plan` shows changes to resources created outside the configuration too
 
 **Bicep Advantages:**
 - Simpler for Azure-only workloads
 - Better Azure Portal integration
 - No state file to manage
-- Faster deployment for Azure resources
+- New Azure features available on day one
 
 **When to use each:**
 - **Terraform**: Multi-cloud, complex workflows, existing Terraform codebase
@@ -904,71 +430,11 @@ output "ip" {
 ## Optional Next Steps
 
 - Compare this exercise with Exercise 2 (manual VM creation) - how much faster is IaC?
+- Deploy the [AWS version](aws/readme.md) with the same module and script
 - Modify the configuration to use a different VM size or Linux distribution
 - Add a second VM to create a VM cluster
-- Store Terraform state remotely in Azure Storage Account
-- Create Terraform modules to reuse configuration
+- Store Terraform state remotely in an Azure Storage Account (`backend "azurerm"`)
 - Explore Terraform workspaces for managing multiple environments (dev/staging/prod)
 - Compare with Exercise 15 (IoT Hub with Terraform) to see Terraform for different services
-- Implement Terraform Cloud for team collaboration and CI/CD
 - Add data sources to query existing Azure resources
 - Use `terraform import` to bring existing resources under Terraform management
-
-## Additional Resources
-
-- [Terraform Documentation](https://www.terraform.io/docs)
-- [Terraform Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-- [Terraform Best Practices](https://www.terraform-best-practices.com/)
-- [Azure VM Documentation](https://docs.microsoft.com/azure/virtual-machines/)
-- [HCL Language Spec](https://github.com/hashicorp/hcl)
-
----
-
-## Reference: Terraform Commands
-
-**Essential commands:**
-
-```bash
-# Initialize working directory
-terraform init
-
-# Validate configuration
-terraform validate
-
-# Format code
-terraform fmt
-
-# Show execution plan
-terraform plan
-
-# Apply changes
-terraform apply
-
-# Destroy infrastructure
-terraform destroy
-
-# Show current state
-terraform show
-
-# List resources in state
-terraform state list
-
-# Get output values
-terraform output
-
-# Refresh state from real infrastructure
-terraform refresh
-```
-
-**Advanced commands:**
-
-```bash
-# Import existing resource
-terraform import azurerm_resource_group.example /subscriptions/.../resourceGroups/myRG
-
-# Remove resource from state (doesn't delete real resource)
-terraform state rm azurerm_resource_group.example
-
-# Move resource in state (rename)
-terraform state mv azurerm_resource_group.old azurerm_resource_group.new
-
