@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Exercise 12 (AWS version): a serverless Node.js function - AWS Lambda with a public
+  function URL, its IAM execution role and its CloudWatch log group.
+
+Parameters:
+  Runtime:
+    Description: Node.js runtime of the function
+    Type: String
+    Default: nodejs24.x
+    AllowedValues:
+      - nodejs24.x
+      - nodejs22.x
+
+  MemorySize:
+    Description: Memory of the function in MB (CPU grows with memory)
+    Type: Number
+    Default: 128
+    AllowedValues:
+      - 128
+      - 256
+      - 512
+
+  LogRetentionInDays:
+    Description: How many days CloudWatch Logs keeps the logs of the function
+    Type: Number
+    Default: 7
+
+Resources:
+  # The execution role: what the function may do (here: only write its logs)
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt FunctionLogGroup.Arn
+
+  # The log group of the function, created by the stack so it is deleted with the stack
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-function
+      RetentionInDays: !Ref LogRetentionInDays
+
+  # The function. The inline code is a placeholder; you upload your own code in Part 3
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-function
+      Runtime: !Ref Runtime
+      Handler: index.handler
+      MemorySize: !Ref MemorySize
+      Timeout: 10
+      Role: !GetAtt FunctionRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref FunctionLogGroup
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({
+            statusCode: 200,
+            body: 'The function works, but your code is not deployed yet.'
+          });
+
+  # The HTTPS address of the function. Auth type NONE: anyone can call it
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref Function
+      AuthType: NONE
+
+  # Two permissions allow public calls: one for the URL, one for running the function through it
+  FunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  FunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunction
+      Principal: '*'
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  FunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref Function
+  FunctionUrl:
+    Description: HTTPS address of the function
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  LogGroupName:
+    Description: CloudWatch log group of the function
+    Value: !Ref FunctionLogGroup
