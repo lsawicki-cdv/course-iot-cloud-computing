@@ -1,0 +1,4 @@
+*.pem.crt
+*.pem.key
+device-policy.json
+downloaded-telemetry.json

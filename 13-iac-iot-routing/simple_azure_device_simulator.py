@@ -6,7 +6,7 @@ from azure.iot.device import IoTHubDeviceClient, Message
 
 def simulate_device():
 
-    conn_str = "connection_strin"
+    conn_str = "connection_string"
     device_client = IoTHubDeviceClient.create_from_connection_string(conn_str)
 
     print("Connecting to Azure IoT")

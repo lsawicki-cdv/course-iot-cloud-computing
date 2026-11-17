@@ -33,6 +33,7 @@ Exercises with an AWS version:
 - 10 - Serverless functions and an AI agent (Azure Functions + Azure OpenAI in Foundry / AWS Lambda + Amazon Bedrock)
 - 11 - Serverless IoT platform (IoT Hub + Stream Analytics + Cosmos DB + Functions / IoT Core + IoT rule + DynamoDB + Lambda + API Gateway)
 - 12 - Infrastructure as Code for serverless functions (Bicep + Azure Functions / CloudFormation + AWS Lambda)
+- 13 - Infrastructure as Code for IoT message routing (Bicep + IoT Hub + Blob Storage / CloudFormation + IoT Core rule + S3)
 
 ## Remote development over SSH using Visual Studio Code
 

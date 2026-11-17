@@ -6,27 +6,32 @@ param projectName string = 'contoso'
 @description('The datacenter to use for the deployment.')
 param location string = resourceGroup().location
 
-@description('The SKU to use for the IoT Hub.')
-param skuName string = 'S1'
+@description('The SKU to use for the IoT Hub (F1 = Free tier, one per subscription; S1 = Standard tier, about $25 per month).')
+@allowed([
+  'F1'
+  'S1'
+])
+param skuName string = 'F1'
 
 @description('The number of IoT Hub units.')
 param skuUnits int = 1
 
-@description('Partitions used for the event stream.')
-param d2cPartitions int = 4
+@description('Partitions used for the event stream (the F1 tier allows only 2).')
+param d2cPartitions int = 2
 
 var iotHubName = '${projectName}Hub${uniqueString(resourceGroup().id)}'
 var storageAccountName = '${toLower(projectName)}${uniqueString(resourceGroup().id)}'
-var storageEndpoint = '${projectName}StorageEndpont'
+var storageEndpoint = '${projectName}StorageEndpoint'
+var storageRoute = '${projectName}StorageRoute'
 var storageContainerName = '${toLower(projectName)}results'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
   sku: {
     name: 'Standard_LRS'
   }
-  kind: 'Storage'
+  kind: 'StorageV2'
   properties: {
     allowBlobPublicAccess: false
     minimumTlsVersion: 'TLS1_2'
@@ -34,7 +39,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   name: '${storageAccountName}/default/${storageContainerName}'
   properties: {
     publicAccess: 'None'
@@ -75,7 +80,7 @@ resource IoTHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
       }
       routes: [
         {
-          name: 'ContosoStorageRoute'
+          name: storageRoute
           source: 'DeviceMessages'
           condition: 'level="storage"'
           endpointNames: [
@@ -118,3 +123,5 @@ output name string = IoTHub.name
 output resourceId string = IoTHub.id
 output resourceGroupName string = resourceGroup().name
 output location string = location
+output storageAccountName string = storageAccount.name
+output storageContainerName string = storageContainerName
