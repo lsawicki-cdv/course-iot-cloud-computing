@@ -1,5 +1,7 @@
 # Azure IoT Hub with Blob Storage - Terraform Deployment
 
+> Using AWS instead? Follow the [AWS version of this exercise](aws/readme.md).
+
 In this exercise, you'll use **Terraform** to deploy a complete IoT infrastructure with automatic message routing to Blob Storage. This is the Terraform equivalent of Exercise 13 (Bicep), so you can compare both Infrastructure as Code approaches. The IoT Hub, the storage account and the route live in a reusable Terraform **module**.
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
