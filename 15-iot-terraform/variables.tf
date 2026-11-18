@@ -1,24 +1,23 @@
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  type        = string
+  description = "Name of the resource group."
   default     = "iot-terraform-rg"
 }
 
 variable "location" {
-  description = "Azure region"
+  type        = string
+  description = "Azure region."
   default     = "uksouth"
 }
 
-variable "iot_hub_name" {
-  description = "Name of the IoT Hub"
-  default     = "terraform-iot-hub"
+variable "name_prefix" {
+  type        = string
+  description = "Prefix of the resource names: lowercase letters and digits, starting with a letter, up to 11 characters."
+  default     = "iot"
 }
 
-variable "storage_account_name" {
-  description = "Name of the storage account"
-  default     = "terraformiotstorage"
-}
-
-variable "container_name" {
-  description = "Name of the blob container"
-  default     = "telemetrydata"
+variable "storage_level" {
+  type        = string
+  description = "Route only messages with this 'level' property to storage. Null routes everything."
+  default     = null
 }

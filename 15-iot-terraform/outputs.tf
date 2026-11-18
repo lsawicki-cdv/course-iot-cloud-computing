@@ -1,16 +1,15 @@
-output "iot_hub_name" {
-  value = azurerm_iothub.iothub.name
+output "resource_group_name" {
+  value = azurerm_resource_group.iot_rg.name
 }
 
-output "iot_hub_connection_string" {
-  value     = azurerm_iothub_shared_access_policy.policy.primary_connection_string
-  sensitive = true
+output "iot_hub_name" {
+  value = module.iot_storage_route.iot_hub_name
 }
 
 output "storage_account_name" {
-  value = azurerm_storage_account.storage.name
+  value = module.iot_storage_route.storage_account_name
 }
 
 output "blob_container_name" {
-  value = azurerm_storage_container.container.name
+  value = module.iot_storage_route.container_name
 }
