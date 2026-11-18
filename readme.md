@@ -35,6 +35,7 @@ Exercises with an AWS version:
 - 12 - Infrastructure as Code for serverless functions (Bicep + Azure Functions / CloudFormation + AWS Lambda)
 - 13 - Infrastructure as Code for IoT message routing (Bicep + IoT Hub + Blob Storage / CloudFormation + IoT Core rule + S3)
 - 14 - Virtual machine with Terraform (Azure VM / Amazon EC2, with a shared Terraform module and cloud-init script)
+- 15 - IoT message routing with Terraform (IoT Hub + Blob Storage / IoT Core rule + S3, with shared Terraform modules)
 
 ## Remote development over SSH using Visual Studio Code
 
