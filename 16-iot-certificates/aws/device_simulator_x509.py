@@ -162,7 +162,6 @@ def send_telemetry(client, message_count=10, interval_seconds=5):
     print()
 
     for i in range(message_count):
-        # Generate telemetry
         message_json = json.dumps(generate_telemetry())
 
         # Send to IoT Core with QoS 1: wait for the PUBACK from the broker
@@ -175,8 +174,7 @@ def send_telemetry(client, message_count=10, interval_seconds=5):
         else:
             print("  ✗ Message not acknowledged (check the device policy allows this topic)")
 
-        # Wait before sending next message
-        if i < message_count - 1:  # Don't wait after last message
+        if i < message_count - 1:
             time.sleep(interval_seconds)
 
     print()
@@ -184,6 +182,7 @@ def send_telemetry(client, message_count=10, interval_seconds=5):
 
 
 def print_troubleshooting():
+    """Print common causes of connection failures."""
     print()
     print("Troubleshooting:")
     print("  • Verify IOT_ENDPOINT is correct (aws iot describe-endpoint --endpoint-type iot:Data-ATS)")
@@ -202,10 +201,8 @@ def main():
     print("=" * 70)
     print()
 
-    # Check configuration
     check_configuration()
 
-    # Create client with X.509 authentication
     client = create_x509_client()
 
     try:
@@ -228,7 +225,6 @@ def main():
         print("  • Encrypted channel: All data is now encrypted with TLS")
         print()
 
-        # Send telemetry
         send_telemetry(
             client,
             message_count=10,
@@ -244,7 +240,6 @@ def main():
         print_troubleshooting()
 
     finally:
-        # Clean disconnect
         print()
         print("Disconnecting...")
         client.disconnect()
