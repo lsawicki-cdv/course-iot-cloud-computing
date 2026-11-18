@@ -1,0 +1,5 @@
+# Amazon Root CA 1 is public and needed by the simulator
+!AmazonRootCA1.pem
+
+# Device policy created in the exercise
+device-policy.json
