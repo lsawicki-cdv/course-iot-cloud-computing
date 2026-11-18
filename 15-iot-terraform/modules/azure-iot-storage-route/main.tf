@@ -14,6 +14,8 @@ resource "azurerm_iothub" "iothub" {
   resource_group_name = var.resource_group_name
   location            = var.location
 
+  event_hub_partition_count = 2 # the F1 tier allows exactly 2 (azurerm 4 defaults to 4)
+
   sku {
     name     = "F1" # Free tier, 8000 messages per day
     capacity = 1
