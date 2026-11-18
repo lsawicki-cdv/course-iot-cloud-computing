@@ -1,0 +1,3 @@
+*.pem.crt
+*.pem.key
+downloaded-telemetry.json
