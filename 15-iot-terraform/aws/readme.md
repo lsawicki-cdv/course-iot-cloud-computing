@@ -64,7 +64,7 @@ The Terraform files:
 ## Tested Environments
 
 - AWS CloudShell (Bash)
-- Ubuntu 24.04/26.04, Terraform v1.11.0, aws provider 6.x
+- Ubuntu 24.04/26.04, Terraform v1.11.0 and later (Step 1 installs v1.16.1), aws provider 6.x
 - Python 3.10+ (`paho-mqtt` 1.6.1)
 
 ## Prerequisites
@@ -498,7 +498,7 @@ aws s3 ls | Select-String telemetry
 
 ## Optional Next Steps
 
-- Add a second device with another `module "device"` block (a different `thing_name`)
+- Add a second device with another `module "device"` block (a different `thing_name` and `output_dir`, so its certificate and key don't overwrite the first device's files)
 - Add an error action to the rule (CloudWatch Logs) to see failed writes
 - Store Terraform state remotely in an S3 bucket (`backend "s3"`)
 - Compare with the [Azure version](../readme.md): same workflow and module style, different resources

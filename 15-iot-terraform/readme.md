@@ -48,7 +48,7 @@ The Terraform files:
 ## Tested Environments
 
 - Ubuntu 24.04/26.04
-- Terraform v1.11.0, azurerm provider 4.x
+- Terraform v1.11.0 and later, azurerm provider 4.x
 - Python 3.10+
 - Azure Cloud Shell (Bash)
 
@@ -267,7 +267,7 @@ pip install -r requirements.txt
 python simple_azure_device_simulator.py
 ```
 
-You should see `Connected to Azure IoT` and a `Message sent: ...` line every 10 seconds. **Keep it running for at least 2 minutes** (the hub writes one batch per minute), then stop it with `Ctrl+C`.
+(In Cloud Shell PowerShell use `python3 -m venv .venv` and `.venv/bin/Activate.ps1`.) You should see `Connected to Azure IoT` and a `Message sent: ...` line every 10 seconds. **Keep it running for at least 2 minutes** (the hub writes one batch per minute), then stop it with `Ctrl+C`.
 
 ---
 
@@ -437,6 +437,8 @@ resource IoTHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
 ---
 
 ## Troubleshooting
+
+The common Terraform problems are in [Common Troubleshooting](../14-iaas-terraform/terraform-basics.md#common-troubleshooting). Exercise specific ones:
 
 ### Apply fails because an F1 IoT Hub already exists
 
