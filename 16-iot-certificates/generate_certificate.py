@@ -3,7 +3,7 @@
 Certificate Generation Script for IoT Device
 
 This script generates a self-signed X.509 certificate that can be used
-to authenticate an IoT device with Azure IoT Hub.
+to authenticate an IoT device with Azure IoT Hub or AWS IoT Core.
 
 In production, you should use certificates signed by a trusted Certificate Authority (CA).
 """
@@ -193,6 +193,8 @@ def main():
     print("2. Upload 'device-cert.pem' to Azure IoT Hub")
     print("3. Create a device in IoT Hub with X.509 authentication")
     print("4. Update and run 'device_simulator_x509.py'")
+    print("AWS IoT Core: run 'python ../inspect_certificate.py' from aws/, then register")
+    print("'device-cert.pem' without a CA, see aws/readme.md")
     print()
 
 

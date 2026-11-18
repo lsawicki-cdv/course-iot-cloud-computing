@@ -129,6 +129,8 @@ def print_certificate_info(certificate):
     print(f"  SHA-1:   {sha1_fingerprint.hex(':').upper()}")
     print()
     print("  ⚠ For Azure IoT Hub, use the SHA-1 fingerprint as the 'Primary Thumbprint'")
+    print("  For AWS IoT Core, the certificate ID is the SHA-256 fingerprint in lowercase without colons:")
+    print(f"  {sha256_fingerprint.hex()}")
     print()
 
     # Extensions
@@ -210,6 +212,7 @@ def main():
     print(f"✓ SHA-1 thumbprint saved to 'thumbprint.txt'")
     print(f"  Copy this value to Azure IoT Hub when creating the device:")
     print(f"  {thumbprint}")
+    print("  AWS IoT Core does not use the thumbprint.")
     print()
 
 
