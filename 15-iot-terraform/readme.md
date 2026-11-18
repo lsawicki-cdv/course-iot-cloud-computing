@@ -1,63 +1,62 @@
 # Azure IoT Hub with Blob Storage - Terraform Deployment
 
-In this exercise, you'll use **Terraform** to deploy a complete IoT infrastructure with automatic message routing to Blob Storage. This is the Terraform equivalent of Exercise 13 (Bicep), allowing you to compare both Infrastructure as Code approaches.
+In this exercise, you'll use **Terraform** to deploy a complete IoT infrastructure with automatic message routing to Blob Storage. This is the Terraform equivalent of Exercise 13 (Bicep), so you can compare both Infrastructure as Code approaches. The IoT Hub, the storage account and the route live in a reusable Terraform **module**.
 
 **Important**: Before starting, check your Azure subscription's [Policy assignments](https://portal.azure.com/#view/Microsoft_Azure_Policy/PolicyMenuBlade.MenuView/~/Assignments) to verify which regions you can deploy resources to. While this guide uses **UK South** as the default region, your subscription may be limited to specific regions (typically 5 allowed regions). Use one of your allowed regions instead.
 
-## Why This Exercise Matters
-
-This exercise demonstrates the same IoT architecture as Exercise 13, but using **Terraform** instead of **Bicep**. This hands-on comparison helps you understand:
-- How the same infrastructure looks in different IaC tools
-- The strengths and weaknesses of each approach
-- When to choose Terraform vs Bicep for your projects
-
 ## Architecture Overview
-
-This Terraform configuration deploys a complete IoT data pipeline:
 
 ```
 IoT Device (Python Simulator)
-    ↓ (HTTPS with Azure IoT SDK)
-Azure IoT Hub
-    ↓ (Message Routing - routes ALL messages)
-Azure Blob Storage (stores telemetry as JSON files)
+    ↓ (MQTT over TLS, Azure IoT SDK)
+Azure IoT Hub (F1)
+    ↓ (Message Routing - all messages by default)
+Azure Blob Storage (telemetry as JSON files, one batch per minute)
+```
+
+The Terraform files:
+
+```
+15-iot-terraform/
+  providers.tf  variables.tf  main.tf  outputs.tf     root configuration: resource group + module call
+  modules/azure-iot-storage-route/                    IoT Hub, storage account, container, endpoint, route
+  simple_azure_device_simulator.py                    the device simulator (as in Exercise 13)
 ```
 
 ### What You'll Learn
 
-- How to deploy IoT Hub infrastructure using Terraform
-- Terraform resource blocks for Azure IoT services
-- Automatic message routing configuration with Terraform
-- Azure IoT Hub endpoint and route resources
-- Comparing Terraform vs Bicep for the same architecture
-- Device connection string authentication
-- Verifying data flow to Blob Storage
+- How to deploy an IoT Hub with message routing to Blob Storage using Terraform
+- How a Terraform module packages resources and how a root configuration calls it
+- How one module input (`storage_level`) switches the route between "everything" and Exercise 13's filter
+- Why Terraform state holds secrets
+- Creating a device with the `az` CLI (Terraform has no resource for it) and verifying the data flow
+- Comparing Terraform with Bicep for the same architecture
 
 ### Comparing with Exercise 13 (Bicep)
 
 | Aspect | Exercise 13 (Bicep) | Exercise 15 (Terraform) |
 |--------|---------------------|-------------------------|
-| Configuration Files | 1 main.bicep file | 4 separate .tf files |
+| Configuration | 1 `main.bicep` file | 4 root `.tf` files + 1 module |
 | Syntax | Bicep DSL | HCL (HashiCorp) |
-| Resource Names | Bicep-specific | Terraform provider names |
-| State Management | Azure-managed | Local terraform.tfstate |
-| Deployment Command | `az deployment group create` | `terraform apply` |
-| Message Routing | Condition-based (`level="storage"`) | Routes all messages (`true`) |
+| Resource names | Bicep `uniqueString` suffix | `random_string` suffix |
+| State | Azure-managed (deployment history) | Local `terraform.tfstate` |
+| Deploy command | `az deployment group create` | `terraform apply` |
+| Message routing | Only `level="storage"` | Everything by default; `-var storage_level=storage` gives Exercise 13's filter |
 
 ## Tested Environments
 
 - Ubuntu 24.04/26.04
-- Terraform v1.11.0
+- Terraform v1.11.0, azurerm provider 4.x
 - Python 3.10+
 - Azure Cloud Shell (Bash)
 
 ## Prerequisites
 
-Before starting, ensure you have:
 - Azure account with active subscription
-- Completed Exercise 14 (Terraform basics)
+- Completed Exercise 14 (Terraform basics), see [Terraform Basics](../14-iaas-terraform/terraform-basics.md)
 - Completed Exercise 13 (IoT Hub with Bicep) recommended for comparison
-- Basic understanding of IoT Hub concepts
+
+The IoT Hub uses the **F1 (free)** SKU, and a subscription can have only **one** F1 hub. Delete other free hubs (for example from Exercises 6 or 13) first, or see Troubleshooting.
 
 ---
 
@@ -67,54 +66,39 @@ Before starting, ensure you have:
 
 1. Navigate to the **Azure Portal** (portal.azure.com)
 2. Click the **Cloud Shell** icon (>_) in the top navigation bar
-3. Ensure you're using the **Bash** environment
+3. Use **Bash** (recommended) or **PowerShell** - the Terraform commands are the same in both
 
-**Verify Terraform installation:**
+Verify Terraform:
 
 ```bash
 terraform version
 ```
 
-You should see `Terraform v1.11.0` or similar.
-
-### Step 2: Create Terraform Project Directory
-
-**Create and navigate to project directory:**
+### Step 2: Get the Terraform Files
 
 ```bash
-mkdir azure-iot-terraform
-cd azure-iot-terraform
+git clone --depth 1 https://github.com/lsawicki-cdv/course-iot-cloud-computing.git
+cd course-iot-cloud-computing/15-iot-terraform
 ```
 
 ---
 
-## Part 2: Create Terraform Configuration Files
+## Part 2: Understand the Terraform Configuration
 
-You'll create 4 Terraform files to define your IoT infrastructure:
+Open the files with `code <file>` (the Cloud Shell editor) or `cat <file>`.
 
-1. **providers.tf** - Configure Terraform and Azure provider
-2. **variables.tf** - Define input variables
-3. **main.tf** - Define Azure resources (IoT Hub, Storage, Routing)
-4. **outputs.tf** - Define values to display after deployment
-
-### Step 3: Create providers.tf
-
-**Create the file:**
-
-```bash
-nano providers.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code providers.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
+### Step 3: providers.tf
 
 ```hcl
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = "~>4.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~>3.0"
     }
   }
 }
@@ -124,465 +108,172 @@ provider "azurerm" {
 }
 ```
 
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
+- `azurerm` signs in with your Azure CLI login and uses the active subscription (`az account show`)
+- `random` is used inside the module for the unique name suffix
 
-**What this does:**
-- Specifies azurerm provider version 3.x
-- Simpler than Exercise 14 (no random or azapi providers needed)
-- `features {}` is required but can be empty for basic deployments
+### Step 4: main.tf (root) - a module call
 
-### Step 4: Create variables.tf
-
-**Create the file:**
-
-```bash
-nano variables.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code variables.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
+The root `main.tf` creates the resource group and calls the module:
 
 ```hcl
-variable "resource_group_name" {
-  description = "Name of the resource group"
-  default     = "iot-terraform-rg"
-}
+module "iot_storage_route" {
+  source = "./modules/azure-iot-storage-route"
 
-variable "location" {
-  description = "Azure region"
-  default     = "uksouth"
-}
-
-variable "iot_hub_name" {
-  description = "Name of the IoT Hub"
-  default     = "terraform-iot-hub"
-}
-
-variable "storage_account_name" {
-  description = "Name of the storage account"
-  default     = "terraformiotstorage"
-}
-
-variable "container_name" {
-  description = "Name of the blob container"
-  default     = "telemetrydata"
-}
-```
-
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
-
-**What this does:**
-- Defines 5 variables with default values
-- Variables make configuration reusable and customizable
-- Storage account name must be globally unique (add random suffix if needed)
-
-**Important:** If you get a naming conflict later, change `storage_account_name` to include random numbers (e.g., `"terraformiotstorage12345"`).
-
-### Step 5: Create main.tf
-
-**Create the file:**
-
-```bash
-nano main.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code main.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
-
-```hcl
-# Create a resource group
-resource "azurerm_resource_group" "iot_rg" {
-  name     = var.resource_group_name
-  location = var.location
-}
-
-resource "azurerm_iothub" "iothub" {
-  name                = var.iot_hub_name
+  name_prefix         = var.name_prefix
   resource_group_name = azurerm_resource_group.iot_rg.name
   location            = azurerm_resource_group.iot_rg.location
-
-  sku {
-    name     = "F1" # Free tier, 8000 messages per day
-    capacity = "1"
-  }
-
-  tags = {
-    purpose = "telemetry"
-  }
-}
-
-resource "azurerm_storage_account" "storage" {
-  name                     = var.storage_account_name
-  resource_group_name      = azurerm_resource_group.iot_rg.name
-  location                 = azurerm_resource_group.iot_rg.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-}
-
-resource "azurerm_storage_container" "container" {
-  name                  = var.container_name
-  storage_account_name  = azurerm_storage_account.storage.name
-  container_access_type = "private"
-}
-
-resource "azurerm_iothub_endpoint_storage_container" "telemetry_endpoint" {
-  resource_group_name = azurerm_resource_group.iot_rg.name
-  iothub_id           = azurerm_iothub.iothub.id
-  name                = "telemetryEndpoint"
-
-  connection_string          = azurerm_storage_account.storage.primary_blob_connection_string
-  batch_frequency_in_seconds = 60
-  max_chunk_size_in_bytes    = 10485760
-  container_name             = azurerm_storage_container.container.name
-  encoding                   = "JSON"
-  file_name_format           = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
-}
-
-resource "azurerm_iothub_route" "telemetry_route" {
-  resource_group_name = azurerm_resource_group.iot_rg.name
-  iothub_name         = azurerm_iothub.iothub.name
-  name                = "telemetryRoute"
-  source              = "DeviceMessages"
-  condition           = "true"
-  endpoint_names      = [azurerm_iothub_endpoint_storage_container.telemetry_endpoint.name]
-  enabled             = true
-}
-
-# Create IoT Hub shared access policy
-resource "azurerm_iothub_shared_access_policy" "policy" {
-  name                = "terraform-policy"
-  resource_group_name = azurerm_resource_group.iot_rg.name
-  iothub_name         = azurerm_iothub.iothub.name
-
-  registry_read   = true
-  registry_write  = true
-  service_connect = true
-  device_connect  = true
+  storage_level       = var.storage_level
 }
 ```
 
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
+A **module** is a directory of `.tf` files with its own inputs (`variable`) and outputs (`output`). The root passes values in, reads results out. The root variables (`variables.tf`) are `resource_group_name` (`iot-terraform-rg`), `location` (`uksouth`), `name_prefix` (`iot`) and `storage_level` (`null`).
 
-**What this creates:**
+### Step 5: The module resources
 
-1. **Resource Group** - Container for all resources
-2. **IoT Hub** - F1 (free tier) with 8,000 messages/day limit
-3. **Storage Account** - Standard LRS for cost-effective storage
-4. **Blob Container** - Named "telemetrydata" for storing messages
-5. **Storage Endpoint** - Connects IoT Hub to Blob Storage
-6. **Route** - Routes ALL device messages to storage (`condition = "true"`)
-7. **Shared Access Policy** - For managing devices and getting connection strings
+`modules/azure-iot-storage-route/main.tf` creates:
 
-**Key Terraform IoT Resources:**
+1. **random_string** - an 8-character suffix, so the globally unique names never collide (hub `iot-hub-<suffix>`, storage `iot<suffix>`). Nothing to edit when a name is taken.
+2. **IoT Hub** (`azurerm_iothub`) - F1 free tier, 8,000 messages per day
+3. **Storage account** - Standard LRS, no public blobs, TLS 1.2 minimum
+4. **Blob container** (`azurerm_storage_container`) - `telemetrydata`, private
+5. **Storage endpoint** (`azurerm_iothub_endpoint_storage_container`) - where the hub writes: JSON, a batch every 60 seconds, file name `{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}`
+6. **Route** (`azurerm_iothub_route`) - which messages go to that endpoint
 
-- `azurerm_iothub` - The IoT Hub itself
-- `azurerm_iothub_endpoint_storage_container` - Defines where to route messages
-- `azurerm_iothub_route` - Defines routing logic (condition and endpoint)
-- `azurerm_iothub_shared_access_policy` - Access permissions
+The module also checks `name_prefix` (lowercase letters and digits, starting with a letter, up to 11 characters) with a `validation` block, so a wrong value fails at plan time.
 
-**Routing Difference from Exercise 13:**
-- **Exercise 13 (Bicep)**: Routes only messages with `level="storage"` property
-- **Exercise 15 (Terraform)**: Routes ALL messages (`condition = "true"`)
-
-### Step 6: Create outputs.tf
-
-**Create the file:**
-
-```bash
-nano outputs.tf
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code outputs.tf` to open the Cloud Shell editor (GUI).
-
-**Copy and paste this content:**
+### Step 6: The route condition and `storage_level`
 
 ```hcl
-output "iot_hub_name" {
-  value = azurerm_iothub.iothub.name
-}
-
-output "iot_hub_connection_string" {
-  value     = azurerm_iothub_shared_access_policy.policy.primary_connection_string
-  sensitive = true
-}
-
-output "storage_account_name" {
-  value = azurerm_storage_account.storage.name
-}
-
-output "blob_container_name" {
-  value = azurerm_storage_container.container.name
-}
+condition = var.storage_level == null ? "true" : "level=\"${var.storage_level}\""
 ```
 
-**Save and exit**: `Ctrl+X`, `Y`, `Enter`
+- By default (`storage_level` is `null`) the condition is `true`: **every** message goes to storage
+- With `-var storage_level=storage` the condition is `level="storage"`: only messages with the custom property `level` equal to `storage`, exactly as in Exercise 13. You try this in Part 6.
 
-**What this does:**
-- Outputs IoT Hub name for reference
-- Outputs connection string (marked sensitive, won't display by default)
-- Outputs storage account and container names
-- Use `terraform output` command to view these later
+### Step 7: outputs.tf
+
+The root returns `resource_group_name`, `iot_hub_name`, `storage_account_name` and `blob_container_name` (the module's outputs passed through). The next steps read them with `terraform output`.
+
+**Terraform state holds secrets.** The storage endpoint uses the storage account connection string, so `terraform.tfstate` contains the **storage account key**. It stays local and is gitignored (`*tfstate*`) - never commit it or paste it anywhere. The readme's blob commands use this key (`--auth-mode key`), which is a teaching shortcut: as the subscription Owner you can read the key anyway.
 
 ---
 
 ## Part 3: Deploy Infrastructure with Terraform
 
-### Step 7: Initialize Terraform
-
-**Run terraform init:**
+### Step 8: Initialize
 
 ```bash
 terraform init -upgrade
 ```
 
-**What this does:**
-- Downloads Azure provider plugin
-- Initializes the working directory
-- Creates `.terraform` directory and lock file
+This downloads the providers and initializes the module.
 
-**Expected output:**
-```
-Initializing the backend...
-Initializing provider plugins...
-- Finding hashicorp/azurerm versions matching "~> 3.0"...
-- Installing hashicorp/azurerm v3.x.x...
-
-Terraform has been successfully initialized!
-```
-
-### Step 8: Review the Execution Plan
-
-**Create an execution plan:**
+### Step 9: Review the Execution Plan
 
 ```bash
 terraform plan -out main.tfplan
 ```
 
-**Expected output:**
-```
-Terraform will perform the following actions:
+You should see `Plan: 7 to add, 0 to change, 0 to destroy.`: the resource group, the random suffix, the IoT Hub, the storage account, the container, the endpoint and the route. To use another region, add `-var location=<region>`.
 
-  # azurerm_iothub.iothub will be created
-  + resource "azurerm_iothub" "iothub" {
-      + name     = "terraform-iot-hub"
-      + sku {
-          + name     = "F1"
-          + capacity = 1
-        }
-    }
-
-  # ... (7 total resources)
-
-Plan: 7 to add, 0 to change, 0 to destroy.
-```
-
-**Review the plan** to ensure correct region and resource names.
-
-### Step 9: Apply the Configuration
-
-**Deploy the infrastructure:**
+### Step 10: Apply
 
 ```bash
 terraform apply main.tfplan
 ```
 
-**Wait 3-4 minutes**. You'll see progress as each resource is created.
+Wait 3-4 minutes. At the end you'll see the outputs:
 
-**Expected output:**
 ```
-azurerm_resource_group.iot_rg: Creating...
-azurerm_resource_group.iot_rg: Creation complete after 2s
-azurerm_iothub.iothub: Creating...
-azurerm_storage_account.storage: Creating...
-...
-azurerm_iothub_route.telemetry_route: Creation complete after 3m15s
-
-Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
-
 Outputs:
 
 blob_container_name = "telemetrydata"
-iot_hub_name = "terraform-iot-hub"
-storage_account_name = "terraformiotstorage"
+iot_hub_name = "iot-hub-k3x9a2bq"
+resource_group_name = "iot-terraform-rg"
+storage_account_name = "iotk3x9a2bq"
 ```
-
-**Important:** Save the IoT Hub name for the next steps!
-
-### Step 10: View Sensitive Outputs
-
-The connection string is marked sensitive and won't display automatically.
-
-**View the IoT Hub connection string:**
-
-```bash
-terraform output -raw iot_hub_connection_string
-```
-
-You'll see something like:
-```
-HostName=terraform-iot-hub.azure-devices.net;SharedAccessKeyName=terraform-policy;SharedAccessKey=...
-```
-
-**Note:** This is the **IoT Hub-level connection string**, not a device connection string. We'll create a device next.
 
 ---
 
-## Part 4: Create Device and Configure Simulator
+## Part 4: Create Device and Run the Simulator
 
-### Step 11: Create IoT Device
+Terraform's `azurerm` provider has no resource for a device identity, so you create it with the `az` CLI.
 
-**Option A: Using Bash (recommended)**
+### Step 11: Create the IoT Device
 
-**Create a device identity:**
+**Option A: Bash (recommended)**
 
 ```bash
 IOT_HUB_NAME=$(terraform output -raw iot_hub_name)
 DEVICE_ID="terraform-device-01"
-```
 
-```bash
 az iot hub device-identity create \
   --hub-name $IOT_HUB_NAME \
   --device-id $DEVICE_ID
-```
 
-**Get device connection string:**
-
-```bash
 az iot hub device-identity connection-string show \
   --hub-name $IOT_HUB_NAME \
   --device-id $DEVICE_ID \
-  --output table
+  --output tsv
 ```
 
-**Important:** Copy the **device connection string** - you'll need it for the simulator.
-
-**Option B: Using PowerShell**
-
-**Create a device identity:**
+**Option B: PowerShell**
 
 ```powershell
 $IOT_HUB_NAME=$(terraform output -raw iot_hub_name)
 $DEVICE_ID="terraform-device-01"
-```
 
-```powershell
 az iot hub device-identity create `
   --hub-name $IOT_HUB_NAME `
   --device-id $DEVICE_ID
-```
 
-**Get device connection string:**
-
-```powershell
 az iot hub device-identity connection-string show `
   --hub-name $IOT_HUB_NAME `
   --device-id $DEVICE_ID `
-  --output table
+  --output tsv
 ```
 
-**Important:** Copy the **device connection string** - you'll need it for the simulator.
+Copy the **device connection string** (`HostName=...;DeviceId=...;SharedAccessKey=...`). It is a secret: don't commit it.
 
-### Step 12: Configure Device Simulator
+### Step 12: Configure the Simulator
 
-The simulator code is already provided in `simple_azure_device_simulator.py`.
+`simple_azure_device_simulator.py` is the same simulator as in Exercise 13: it sends temperature, humidity and pressure every 10 seconds, with the custom property `level="storage"`. Open it (`code simple_azure_device_simulator.py`) and on line 9 replace
 
-**View the simulator code:**
-
-```bash
-cat simple_azure_device_simulator.py
-```
-
-**Key points in the code:**
-- Uses Azure IoT SDK (same as Exercise 13)
-- Sends temperature, humidity, pressure data
-- Includes custom property `level="storage"` (not needed here since we route all messages)
-- Sends messages every 10 seconds
-
-**Update the connection string:**
-
-```bash
-nano simple_azure_device_simulator.py
-```
-
-**Note:** In Azure Cloud Shell, `nano` works in both Bash and PowerShell modes. Alternatively, you can use `code simple_azure_device_simulator.py` to open the Cloud Shell editor (GUI).
-
-**Change line 9** from:
 ```python
 conn_str = "connection_string"
 ```
 
-To your actual device connection string:
-```python
-conn_str = "HostName=terraform-iot-hub.azure-devices.net;DeviceId=terraform-device-01;SharedAccessKey=..."
-```
+with your device connection string.
 
-**Save**: `Ctrl+X`, `Y`, `Enter`
+### Step 13: Run the Simulator
 
-### Step 13: Run Device Simulator
+**Option A: Bash (recommended)**
 
-**Create Python virtual environment:**
-
-**On macOS/Linux:**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-**On Windows:**
-```powershell
-py -m venv .venv
-.venv\scripts\activate
-```
-
-**Install dependencies:**
-
-```bash
 pip install -r requirements.txt
-```
-
-This installs `azure-iot-device` SDK.
-
-**Run the simulator:**
-
-```bash
 python simple_azure_device_simulator.py
 ```
 
-**Expected output:**
-```
-Connecting to Azure IoT
-Connected to Azure IoT
-Message sent: {"temperature": 24.5, "humidity": 52.3, "pressure": 1012.1}
-Message sent: {"temperature": 25.1, "humidity": 53.8, "pressure": 1013.5}
+**Option B: PowerShell**
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python simple_azure_device_simulator.py
 ```
 
-**Keep the simulator running** for at least 2-3 minutes to ensure data is batched and written to storage.
+You should see `Connected to Azure IoT` and a `Message sent: ...` line every 10 seconds. **Keep it running for at least 2 minutes** (the hub writes one batch per minute), then stop it with `Ctrl+C`.
 
 ---
 
 ## Part 5: Verify Data Flow to Blob Storage
 
-### Step 14: Check Data in Azure Portal
+Wait one more minute after stopping the simulator. In a second terminal (or after stopping the simulator), from the `15-iot-terraform` directory:
 
-**Wait 1-2 minutes** for IoT Hub to batch and write data (configured to batch every 60 seconds).
-
-**Option 1: Via Azure Portal**
-
-1. Navigate to your Storage Account in Azure Portal
-2. Search for the storage account name (from `terraform output`)
-3. Click **Storage Browser** → **Blob containers**
-4. Click on **telemetrydata** container
-5. Navigate through folders: `{iot-hub-name}/{partition}/YYYY/MM/DD/HH/mm/`
-6. Download and open a JSON file
-
-**Option 2: Via Azure CLI**
-
-**Using Bash:**
-
-**List blobs:**
+**Option A: Bash (recommended)**
 
 ```bash
 STORAGE_ACCOUNT=$(terraform output -raw storage_account_name)
@@ -591,35 +282,26 @@ CONTAINER=$(terraform output -raw blob_container_name)
 az storage blob list \
   --account-name $STORAGE_ACCOUNT \
   --container-name $CONTAINER \
-  --output table \
-  --auth-mode login
-```
+  --auth-mode key \
+  --output table
 
-**Download a blob:**
-
-```bash
-# Get the first blob name
 BLOB_NAME=$(az storage blob list \
   --account-name $STORAGE_ACCOUNT \
   --container-name $CONTAINER \
-  --auth-mode login \
+  --auth-mode key \
   --query "[0].name" -o tsv)
 
-# Download it
 az storage blob download \
   --account-name $STORAGE_ACCOUNT \
   --container-name $CONTAINER \
   --name "$BLOB_NAME" \
   --file telemetry-data.json \
-  --auth-mode login
+  --auth-mode key
 
-# View content
 cat telemetry-data.json
 ```
 
-**Using PowerShell:**
-
-**List blobs:**
+**Option B: PowerShell**
 
 ```powershell
 $STORAGE_ACCOUNT=$(terraform output -raw storage_account_name)
@@ -628,85 +310,111 @@ $CONTAINER=$(terraform output -raw blob_container_name)
 az storage blob list `
   --account-name $STORAGE_ACCOUNT `
   --container-name $CONTAINER `
-  --output table `
-  --auth-mode login
-```
+  --auth-mode key `
+  --output table
 
-**Download a blob:**
-
-```powershell
-# Get the first blob name
 $BLOB_NAME=$(az storage blob list `
   --account-name $STORAGE_ACCOUNT `
   --container-name $CONTAINER `
-  --auth-mode login `
+  --auth-mode key `
   --query "[0].name" -o tsv)
 
-# Download it
 az storage blob download `
   --account-name $STORAGE_ACCOUNT `
   --container-name $CONTAINER `
   --name "$BLOB_NAME" `
   --file telemetry-data.json `
-  --auth-mode login
+  --auth-mode key
 
-# View content
-cat telemetry-data.json
+Get-Content telemetry-data.json
 ```
 
-**Expected content:**
+You can also browse the container in the Azure Portal (storage account → **Storage browser** → **Blob containers** → `telemetrydata`). Each file holds one JSON object per message, one per line:
 
 ```json
-{
-  "temperature": 24.5,
-  "humidity": 52.3,
-  "pressure": 1012.1
-}
-{
-  "temperature": 25.1,
-  "humidity": 53.8,
-  "pressure": 1013.5
-}
+{"EnqueuedTimeUtc":"2026-11-18T16:47:50Z","Properties":{"level":"storage"},"SystemProperties":{"connectionDeviceId":"terraform-device-01",...},"Body":{"temperature": 29.27, "humidity": 40.71, "pressure": 1069.17}}
 ```
 
-Each file contains multiple JSON objects (one per line).
+`Body` is the payload of the simulator. The endpoint writes the whole IoT Hub message, so you also see the device ID and the custom properties (`level`).
 
 ---
 
-## Part 6: Compare Terraform vs Bicep
+## Part 6: Experiment with the Route Filter
 
-### Step 15: Side-by-Side Comparison
+Switch the route to Exercise 13's behavior by changing one module input.
+
+### Step 14: Filter on `level="storage"`
+
+First count the blobs now (wait 2 minutes after stopping the simulator, so the last batch is written):
+
+**Option A: Bash (recommended)**
+
+```bash
+az storage blob list --account-name $STORAGE_ACCOUNT --container-name $CONTAINER \
+  --auth-mode key --query "length(@)"
+```
+
+**Option B: PowerShell**
+
+```powershell
+az storage blob list --account-name $STORAGE_ACCOUNT --container-name $CONTAINER `
+  --auth-mode key --query "length(@)"
+```
+
+Apply with the filter (an in-place update of the route):
+
+```bash
+terraform apply -var storage_level=storage
+```
+
+Review the plan (`condition: "true" -> "level=\"storage\""`) and type `yes`. Now open `simple_azure_device_simulator.py` and comment out the property line:
+
+```python
+# message.custom_properties["level"] = "storage"
+```
+
+Run the simulator again for 2 minutes, stop it, wait 2 more minutes and count the blobs again with the command above. The number is **unchanged**: the messages have no `level` property, so they no longer match the route (they go to the hub's built-in endpoint instead, see Exercise 13).
+
+### Step 15: Restore
+
+Remove the `#` from the property line, and switch the route back to everything:
+
+```bash
+terraform apply
+```
+
+(Without `-var`, `storage_level` is `null` again.) Run the simulator once more if you want to see new blobs.
+
+---
+
+## Part 7: Terraform vs Bicep
 
 **Terraform (Exercise 15):**
-- **Pros**: Multi-cloud, mature ecosystem, detailed state management
-- **Cons**: More files, requires state management, learning curve
-- **Files**: 4 separate .tf files
-- **Routing**: All messages automatically routed
+- **Pros**: Multi-cloud, mature ecosystem, reusable modules, explicit plan before every change
+- **Cons**: More files, state to manage (and protect), providers to install
 
 **Bicep (Exercise 13):**
-- **Pros**: Azure-native, simpler syntax, no state file to manage
-- **Cons**: Azure-only, newer (less mature)
-- **Files**: 1 main.bicep file
-- **Routing**: Conditional routing with custom properties
+- **Pros**: Azure-native, one file, no state file to manage, new Azure features immediately
+- **Cons**: Azure-only
 
-**Resource Declaration Comparison:**
+**Resource declaration comparison:**
 
-**Terraform:**
 ```hcl
+# Terraform
 resource "azurerm_iothub" "iothub" {
-  name                = var.iot_hub_name
-  resource_group_name = azurerm_resource_group.iot_rg.name
-  location            = azurerm_resource_group.iot_rg.location
+  name                = "${var.name_prefix}-hub-${random_string.suffix.result}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
 
   sku {
     name     = "F1"
-    capacity = "1"
+    capacity = 1
   }
 }
 ```
 
-**Bicep (Exercise 13):**
 ```bicep
+// Bicep (Exercise 13)
 resource IoTHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
   name: iotHubName
   location: location
@@ -717,182 +425,77 @@ resource IoTHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
 }
 ```
 
-**Key Differences:**
-1. **Syntax**: Bicep uses `:` and `=`, Terraform uses `=` and `{}`
-2. **Resource Type**: Bicep specifies API version, Terraform abstracts it
-3. **References**: Terraform uses `.` notation, Bicep direct references
-4. **State**: Terraform needs `terraform.tfstate`, Bicep tracks via Azure
+1. **Syntax**: Bicep uses `:` for properties, Terraform uses `=` and nested blocks
+2. **API version**: Bicep states it, the Terraform provider hides it
+3. **Reuse**: Terraform modules (this exercise) vs Bicep modules/parameters
+4. **State**: `terraform.tfstate` (with secrets) vs deployment history kept by Azure
+
+**Use Terraform when** you work with more than one cloud or your team already uses it. **Use Bicep when** you deploy only to Azure and want the simplest setup.
 
 ---
 
 ## Troubleshooting
 
+### Apply fails because an F1 IoT Hub already exists
+
+- A subscription can have only one free hub. Delete the other one (`az iot hub list --output table`, then `az iot hub delete --name <hub> --resource-group <rg>`) or destroy that exercise first
+
+### Plan or apply fails with "subscription ID could not be determined"
+
+- **Sign in**: Run `az login` (not needed in Cloud Shell) and check `az account show`
+- **Pick the subscription**: Run `az account set --subscription <id>`, or `export ARM_SUBSCRIPTION_ID=<id>` (Bash) / `$env:ARM_SUBSCRIPTION_ID="<id>"` (PowerShell)
+
+### Plan fails with "name_prefix must start with a lowercase letter..."
+
+- Use only lowercase letters and digits, start with a letter, at most 11 characters: `terraform plan -var name_prefix=myiot -out main.tfplan`
+
+### Plan fails with "undeclared variable" (`storage_account_name`, `iot_hub_name`)
+
+- Those variables of the older version of this exercise no longer exist: names are unique by themselves now. Remove the `-var`
+
 ### No data in Blob Storage
 
-- **Wait longer**: Batching frequency is 60 seconds, plus processing time
-- **Check simulator**: Ensure it's connected and sending messages
-- **Check routing**: Verify route is enabled in Azure Portal → IoT Hub → Message routing
-- **Check container**: Ensure container exists and route points to correct name
+- **Wait longer**: Batching is 60 seconds, plus processing time
+- **Check the simulator**: It must print `Connected to Azure IoT` and `Message sent`; check that you used the **device** connection string
+- **Check the route**: Azure Portal → IoT Hub → Message routing; the route must be enabled. With `storage_level` set, messages need the `level` property
+- **Free tier limit**: F1 accepts 8,000 messages per day
 
-### Terraform init fails
+### I deployed an older version of this exercise
 
-- **Check internet**: Cloud Shell needs connectivity
-- **Clear cache**: Delete `.terraform` directory and retry
-- **Check provider version**: Ensure `~> 3.0` is correct
-
-### Apply fails with "name already in use"
-
-- **Storage account name conflict**: Change `storage_account_name` variable to include random suffix
-- **IoT Hub name conflict**: Change `iot_hub_name` variable to be globally unique
-- **Resource group exists**: Delete existing group or use different name
-
-### Device connection fails
-
-- **Wrong connection string**: Ensure you copied the **device** connection string, not IoT Hub connection string
-- **Device doesn't exist**: Create device with `az iot hub device-identity create`
-- **Check IoT Hub name**: Verify simulator uses correct hostname
-
-### "InvalidParameter" for storage endpoint
-
-- **Container doesn't exist**: Ensure storage container is created before endpoint
-- **Check dependencies**: Terraform should handle this automatically
-- **Retry deployment**: Sometimes Azure needs a moment; run `terraform apply` again
+- Applying the new files over an old deployment would delete and recreate the hub and storage account. Run `terraform destroy` with the **old** files first, then start again from Step 2
 
 ---
 
 ## Cleanup
 
-**Important:** Delete all resources to avoid charges!
+**Important:** Delete all resources (this also deletes the stored telemetry and frees the F1 hub).
 
-### Step 16: Destroy Infrastructure
-
-**Create destroy plan:**
+**Option A: Bash (recommended)**
 
 ```bash
 terraform plan -destroy -out main.destroy.tfplan
-```
-
-**Review the plan** - ensure it's destroying the correct resources.
-
-**Apply the destroy plan:**
-
-```bash
 terraform apply main.destroy.tfplan
+az group exists --name iot-terraform-rg
 ```
 
-Wait 2-3 minutes. All 7 resources will be deleted.
+**Option B: PowerShell**
 
-**Verify cleanup:**
-
-**Using Bash:**
-```bash
-az group list --output table | grep iot-terraform
-```
-
-**Using PowerShell:**
 ```powershell
-az group list --output table | grep iot-terraform
+terraform plan -destroy -out main.destroy.tfplan
+terraform apply main.destroy.tfplan
+az group exists --name iot-terraform-rg
 ```
 
-The resource group should be gone.
-
----
-
-## Summary and Learning Outcomes
-
-Congratulations! You've deployed IoT infrastructure using Terraform. You learned:
-
-✅ **Terraform for IoT**: Deploying IoT Hub and storage with message routing
-✅ **Terraform IoT Resources**: `azurerm_iothub`, routing endpoints, and routes
-✅ **Message Routing**: Automatic routing of all device messages to storage
-✅ **State Management**: Working with terraform.tfstate
-✅ **Terraform Outputs**: Retrieving connection strings and resource names
-✅ **Device Integration**: Connecting Python simulator to Terraform-deployed infrastructure
-✅ **Terraform vs Bicep**: Hands-on comparison of two IaC approaches
-
-### Architecture Pattern Reinforced
-
-This exercise reinforces the **Cold Path** storage pattern:
-- Devices send telemetry to IoT Hub
-- IoT Hub automatically routes to Blob Storage
-- Data stored for long-term analytics, compliance, ML training
-
-### Terraform vs Bicep - When to Use Each
-
-**Use Terraform when:**
-- Working with multiple cloud providers (AWS, GCP, Azure)
-- Need mature tooling and large community
-- Want explicit state management control
-- Team already uses Terraform
-
-**Use Bicep when:**
-- Azure-only workloads
-- Want simpler syntax and fewer files
-- Prefer Azure-native tools
-- Don't want to manage state files
-
-**Both are excellent choices** - the "best" tool depends on your specific needs!
+Wait 2-3 minutes. The last command should print `false`. Also delete the downloaded `telemetry-data.json`.
 
 ## Optional Next Steps
 
-- Modify the route condition to filter messages (like Exercise 13's `level="storage"`)
-- Add a second route to send data to Event Grid or Service Bus
-- Deploy this same architecture to AWS using Terraform (use AWS IoT Core)
-- Compare deployment times: Bicep vs Terraform
-- Add Terraform modules to reuse this IoT configuration
-- Implement remote state storage in Azure Storage Account
-- Add more complex routing with multiple endpoints
-- Create Terraform workspaces for dev/staging/prod environments
+- Add a second route (Event Hub or Service Bus endpoint)
+- Move the state to an Azure Storage Account (remote state)
+- Create workspaces for dev/staging/prod
 
 ## Additional Resources
 
-- [Terraform Azure IoT Hub Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/iothub)
-- [Terraform vs Bicep Comparison](https://docs.microsoft.com/azure/developer/terraform/comparing-terraform-and-bicep)
-- [Azure IoT Hub Routing](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messages-d2c)
-- [Terraform Best Practices](https://www.terraform-best-practices.com/)
-
----
-
-## Reference: Key Terraform IoT Resources
-
-**IoT Hub:**
-```hcl
-resource "azurerm_iothub" "example" {
-  name                = "my-iothub"
-  resource_group_name = azurerm_resource_group.example.name
-  location            = azurerm_resource_group.example.location
-
-  sku {
-    name     = "F1"  # or "S1", "S2", "S3"
-    capacity = "1"
-  }
-}
-```
-
-**Storage Endpoint:**
-```hcl
-resource "azurerm_iothub_endpoint_storage_container" "example" {
-  resource_group_name = azurerm_resource_group.example.name
-  iothub_id           = azurerm_iothub.example.id
-  name                = "endpoint-name"
-
-  connection_string          = azurerm_storage_account.example.primary_blob_connection_string
-  batch_frequency_in_seconds = 60
-  container_name             = "container-name"
-  encoding                   = "JSON"
-}
-```
-
-**Route:**
-```hcl
-resource "azurerm_iothub_route" "example" {
-  resource_group_name = azurerm_resource_group.example.name
-  iothub_name         = azurerm_iothub.example.name
-  name                = "route-name"
-
-  source         = "DeviceMessages"
-  condition      = "true"  # or custom condition
-  endpoint_names = [azurerm_iothub_endpoint_storage_container.example.name]
-  enabled        = true
-}
-```
+- [Terraform azurerm_iothub](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/iothub)
+- [Terraform modules](https://developer.hashicorp.com/terraform/language/modules)
+- [Azure IoT Hub message routing](https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messages-d2c)
