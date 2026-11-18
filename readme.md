@@ -36,6 +36,7 @@ Exercises with an AWS version:
 - 13 - Infrastructure as Code for IoT message routing (Bicep + IoT Hub + Blob Storage / CloudFormation + IoT Core rule + S3)
 - 14 - Virtual machine with Terraform (Azure VM / Amazon EC2, with a shared Terraform module and cloud-init script)
 - 15 - IoT message routing with Terraform (IoT Hub + Blob Storage / IoT Core rule + S3, with shared Terraform modules)
+- 16 - IoT device certificates (IoT Hub X.509 / IoT Core, own certificate registered without a CA)
 
 ## Remote development over SSH using Visual Studio Code
 
