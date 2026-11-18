@@ -368,7 +368,7 @@ openssl s_client \
 (On Linux or macOS with PowerShell, use `openssl` instead of the full path.)
 
 In the output you should see:
-- the server certificate chain: depth=2 Amazon Root CA 1, depth=1 Amazon RSA 2048 M01, depth=0 `*.iot.<region>.amazonaws.com`,
+- the server certificate chain: depth=2 Amazon Root CA 1, depth=1 an Amazon RSA 2048 intermediate (for example `Amazon RSA 2048 M01`; the number can differ), depth=0 `*.iot.<region>.amazonaws.com`,
 - the server asking for a client certificate, shown as `No client certificate CA names sent` (IoT Core does not list accepted CAs) followed by `Requested Signature Algorithms`,
 - `Verify return code: 0 (ok)`.
 
@@ -404,7 +404,17 @@ In the output you should see:
 
 When finished, run these commands in **AWS CloudShell**, in the session where you set the variables (`REGION`, `THING_NAME`, `CERTIFICATE_ARN`, `CERTIFICATE_ID`). The order matters: IoT Core refuses to delete a certificate that is still active or attached.
 
+If your CloudShell session timed out, set the variables again:
+
 **Option A: Using Bash (recommended)**
+```bash
+REGION="eu-west-2"
+THING_NAME="device-x509-test"
+CERTIFICATE_ARN=$(aws iot list-thing-principals --region $REGION --thing-name $THING_NAME --query "principals[0]" --output text)
+CERTIFICATE_ID=${CERTIFICATE_ARN##*/}
+```
+
+Then delete the resources:
 ```bash
 aws iot detach-thing-principal --region $REGION --thing-name $THING_NAME --principal $CERTIFICATE_ARN
 aws iot detach-policy --region $REGION --policy-name ${THING_NAME}-policy --target $CERTIFICATE_ARN
@@ -415,6 +425,14 @@ aws iot delete-policy --region $REGION --policy-name ${THING_NAME}-policy
 ```
 
 **Option B: Using PowerShell**
+```powershell
+$REGION="eu-west-2"
+$THING_NAME="device-x509-test"
+$CERTIFICATE_ARN=$(aws iot list-thing-principals --region $REGION --thing-name $THING_NAME --query "principals[0]" --output text)
+$CERTIFICATE_ID=$CERTIFICATE_ARN.Split('/')[-1]
+```
+
+Then delete the resources:
 ```powershell
 aws iot detach-thing-principal --region $REGION --thing-name $THING_NAME --principal $CERTIFICATE_ARN
 aws iot detach-policy --region $REGION --policy-name "$THING_NAME-policy" --target $CERTIFICATE_ARN
