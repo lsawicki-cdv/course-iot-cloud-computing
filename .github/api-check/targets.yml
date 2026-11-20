@@ -1,0 +1,8 @@
+# Every skip and emulator gap needs a reason.
+skip: []
+emulator_gaps: []
+python:
+  parent_requirements: [6-paas-iot-mqtt/aws]
+  skip_imports: []
+azure: []
+aws: []
