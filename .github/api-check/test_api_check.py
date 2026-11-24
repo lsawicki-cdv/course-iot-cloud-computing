@@ -1,11 +1,15 @@
 import json
 import os
+import stat
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
 import check_cli
+import check_python
 import common
 import summary
 
@@ -251,3 +255,104 @@ def test_summary_appends_to_step_summary(capsys, tmp_path, monkeypatch):
 def test_summary_footer_lists_gaps(capsys):
     _, out = summarize(capsys)
     assert 'short flags' in out and 'positional arguments' in out and 'data plane' in out
+
+
+REPO = Path(__file__).resolve().parents[2]
+PARENT_REQUIREMENTS = ['6-paas-iot-mqtt/aws']
+
+
+def tracked_python_inputs():
+    names = subprocess.run(['git', 'ls-files'], cwd=REPO, capture_output=True, text=True, check=True).stdout
+    return [name for name in names.splitlines() if not name.startswith('.github/')]
+
+
+def units_of(cloud):
+    return {unit.name: unit for unit in check_python.build_units(cloud, tracked_python_inputs(), PARENT_REQUIREMENTS)}
+
+
+def test_azure_units():
+    units = units_of('azure')
+    nosql = units['9-storage-nosql']
+    assert nosql.requirements == ['-r', '9-storage-nosql/requirements.txt']
+    assert set(nosql.files) == {'9-storage-nosql/azure-cosmosdb-sample.py', '9-storage-nosql/config.py'}
+    assert {'18-timescaledb-terraform', '18-timescaledb-terraform_app'} <= set(units)
+    assert '18-timescaledb-terraform/app/api.py' not in units['18-timescaledb-terraform'].files
+    assert units['18-timescaledb-terraform_app'].files == ['18-timescaledb-terraform/app/api.py']
+    assert not any('/aws/' in name for unit in units.values() for name in unit.files)
+    assert not any(name.endswith('_aws') for name in units)
+
+
+def test_aws_units():
+    units = units_of('aws')
+    for exercise in ('13-iac-iot-routing', '15-iot-terraform', '16-iot-certificates'):
+        assert units[f'{exercise}_aws'].requirements == ['-r', f'{exercise}/aws/requirements.txt']
+    assert units['6-paas-iot-mqtt_aws'].requirements == ['-r', '6-paas-iot-mqtt/requirements.txt', 'boto3']
+    for exercise in ('9-storage-nosql', '10-faas-functions', '11-serverless-iot-platform'):
+        assert units[f'{exercise}_aws'].requirements == ['boto3']
+    assert '9-storage-nosql/aws/dynamodb_sample.py' in units['9-storage-nosql_aws'].files
+    assert all('/aws/' in name for unit in units.values() for name in unit.files)
+
+
+def test_import_collector_finds_function_level_import():
+    source = (REPO / '10-faas-functions/function_app.py').read_text()
+    assert 'openai' in {module for module, _ in check_python.collect_imports(source)}
+
+
+def test_import_collector_absolute_only_with_lines():
+    found = check_python.collect_imports('import a.b, c\nfrom . import d\nfrom e.f import g\n')
+    assert found == [('a.b', 1), ('c', 1), ('e.f', 3)]
+
+
+def test_resolver_finds_shared_module_via_exercise_root():
+    root = '10-faas-functions'
+    entry = {'file': f'{root}/aws/agent_function.py', 'directory': str(REPO / root / 'aws'),
+             'root': str(REPO / root), 'imports': [['sensor_tools', 14], ['os', 9], ['no_such_module_xyz', 15]]}
+    assert check_python.resolve(sys.executable, [entry]) == [
+        {'file': f'{root}/aws/agent_function.py', 'line': 15, 'module': 'no_such_module_xyz'}]
+
+
+def fake_pip(tmp_path, body):
+    script = tmp_path / 'pip'
+    script.write_text('#!/bin/bash\n' + body + '\n')
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return [str(script)]
+
+
+def run_unit_rows(tmp_path, **kwargs):
+    unit = check_python.Unit('u', 'azure', 'u', [], ['-r', 'x'])
+    check_python.run_unit(unit, tmp_path, tmp_path / 'venv', skip=[], **kwargs)
+    return common.read_rows()
+
+
+def test_pip_failure_is_drift_with_last_error_line(tmp_path):
+    pip = fake_pip(tmp_path, 'echo start; echo "ERROR: no matching distribution" >&2; exit 1')
+    rows = run_unit_rows(tmp_path, pip=pip)
+    assert [(row['layer'], row['status'], row['error']) for row in rows] == [
+        ('python', 'drift', 'ERROR: no matching distribution')]
+
+
+def test_pip_timeout_is_infrastructure(tmp_path):
+    rows = run_unit_rows(tmp_path, pip=fake_pip(tmp_path, 'sleep 5'), timeout=1)
+    assert [(row['status']) for row in rows] == ['infrastructure']
+
+
+def test_unresolved_import_is_drift_with_file_line_and_skip(tmp_path):
+    (tmp_path / 'u').mkdir()
+    (tmp_path / 'u/a.py').write_text('import os\nimport no_such_xyz\nimport layer_mod\n')
+    unit = check_python.Unit('u', 'azure', 'u', ['u/a.py'], [])
+    skip = [{'target': 'layer_mod', 'reason': 'Lambda layer'}]
+    check_python.run_unit(unit, tmp_path, tmp_path / 'venv', skip=skip, pip=fake_pip(tmp_path, 'exit 0'))
+    rows = {row['target']: row for row in common.read_rows() if row['check'] == 'import'}
+    assert (rows['no_such_xyz']['status'], rows['no_such_xyz']['file'], rows['no_such_xyz']['line']) == (
+        'drift', 'u/a.py', 2)
+    assert rows['layer_mod']['status'] == 'skipped' and 'os' not in rows
+
+
+def test_main_exits_zero_with_drift_row(tmp_path):
+    (tmp_path / 'u').mkdir()
+    (tmp_path / 'u/requirements.txt').write_text('x\n')
+    (tmp_path / 'u/a.py').write_text('import no_such_xyz\n')
+    code = check_python.main(['--cloud', 'azure', '--unit', 'u'], root=tmp_path, files=['u/requirements.txt', 'u/a.py'],
+                             pip=fake_pip(tmp_path, 'exit 0'))
+    assert code == 0
+    assert any(row['status'] == 'drift' for row in common.read_rows())
