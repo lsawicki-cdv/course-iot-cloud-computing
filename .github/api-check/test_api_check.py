@@ -10,6 +10,7 @@ import yaml
 
 import check_cli
 import check_python
+import run_azure_targets
 import common
 import summary
 
@@ -356,3 +357,66 @@ def test_main_exits_zero_with_drift_row(tmp_path):
                              pip=fake_pip(tmp_path, 'exit 0'))
     assert code == 0
     assert any(row['status'] == 'drift' for row in common.read_rows())
+
+
+def test_bicep_classification():
+    assert run_azure_targets.classify_bicep(0, 'main.bicep(3,1) : Warning BCP081: no type for x')[0] == 'drift'
+    assert run_azure_targets.classify_bicep(0, 'main.bicep(3,1) : Warning no-unused-params: x') == ('ok', None)
+    status, error = run_azure_targets.classify_bicep(1, 'main.bicep(9,2) : Error BCP035: bad')
+    assert status == 'drift' and 'BCP035' in error
+    assert run_azure_targets.classify_bicep(0, '')[0] == 'ok'
+
+
+def terraform_json(*diagnostics, valid=False):
+    return json.dumps({'valid': valid, 'diagnostics': list(diagnostics)})
+
+
+def diagnostic(filename, line, summary):
+    return {'severity': 'error', 'summary': summary, 'range': {'filename': filename, 'start': {'line': line}}}
+
+
+def test_terraform_errors_one_row_each():
+    text = terraform_json(diagnostic('main.tf', 4, 'Unsupported argument'), diagnostic('x.tf', 9, 'Bad block'))
+    rows = run_azure_targets.classify_terraform(text)
+    assert rows == [('main.tf:4', 'drift', 'Unsupported argument'), ('x.tf:9', 'drift', 'Bad block')]
+
+
+def test_terraform_valid_one_ok_row():
+    assert run_azure_targets.classify_terraform(terraform_json(valid=True)) == [('terraform validate', 'ok', None)]
+
+
+def test_terraform_unparsable_output_is_drift():
+    rows = run_azure_targets.classify_terraform('boom')
+    assert rows[0][1] == 'drift'
+
+
+GAPS = [{'pattern': 'not supported by the emulator', 'reason': 'preview image lacks it'}]
+
+
+def test_sample_classification():
+    classify = run_azure_targets.classify_sample
+    assert classify(0, 'Database created\nrun_sample done', GAPS) == ('ok', None, None)
+    status, error, _ = classify(0, 'run_sample has caught an error. Bad thing\nrun_sample done', GAPS)
+    assert status == 'drift' and 'Bad thing' in error
+    status, _, reason = classify(0, 'run_sample has caught an error. not supported by the emulator', GAPS)
+    assert (status, reason) == ('not-covered', 'preview image lacks it')
+    assert classify(1, 'Traceback\nValueError: x', GAPS)[0:2] == ('drift', 'ValueError: x')
+
+
+def test_azure_main_writes_pending_then_rows(tmp_path, monkeypatch):
+    for name in ('12-x', '14-y'):
+        (tmp_path / name).mkdir()
+    targets = {'azure': [{'exercise': '12', 'kind': 'bicep', 'directory': '12-x'},
+                         {'exercise': '14', 'kind': 'terraform', 'directory': '14-y'}]}
+    monkeypatch.setattr(common, 'load_targets', lambda: targets)
+    seen = []
+
+    def fake_target(entry, root, gaps):
+        seen.append([row['status'] for row in common.read_rows()])
+        if entry['kind'] == 'terraform':
+            raise RuntimeError('boom')
+    monkeypatch.setattr(run_azure_targets, 'run_target', fake_target)
+    assert run_azure_targets.main([], root=tmp_path) == 0
+    assert seen == [['pending'], ['pending', 'pending']]
+    statuses = {row['exercise']: row['status'] for row in common.read_rows()}
+    assert statuses == {'12': 'pending', '14': 'infrastructure'}

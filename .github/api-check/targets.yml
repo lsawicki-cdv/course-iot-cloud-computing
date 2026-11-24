@@ -4,5 +4,11 @@ emulator_gaps: []
 python:
   parent_requirements: [6-paas-iot-mqtt/aws]
   skip_imports: []
-azure: []
+azure:
+  - {exercise: '12', kind: bicep, directory: 12-iac-serverless-functions}
+  - {exercise: '13', kind: bicep, directory: 13-iac-iot-routing}
+  - {exercise: '14', kind: terraform, directory: 14-iaas-terraform}
+  - {exercise: '15', kind: terraform, directory: 15-iot-terraform}
+  - {exercise: '18', kind: terraform, directory: 18-timescaledb-terraform}
+  - {exercise: '9', kind: cosmos, directory: 9-storage-nosql}
 aws: []
