@@ -19,11 +19,12 @@ import common
 REPO_ROOT = check_cli.REPO_ROOT
 SHIMS = Path(__file__).with_name('shims')
 SCRIPT_TIMEOUT = 600
+DEPLOY_TIMEOUT = 660  # above the shim's 600 s, so the shim records the timeout first
 TERRAFORM_TIMEOUT = 600
 STEP_TIMEOUT = 300
 REGION = 'eu-west-2'
 EMULATOR_ACCOUNT = '000000000000'
-ENDPOINT = re.compile(r'https://127\.0\.0\.1:\d+/?')
+ENDPOINT = re.compile(r'https://127\.0\.0\.1:[0-9]+/?')
 # Variables that would let a child process reach a real AWS account.
 REAL_CREDENTIALS = (
     'AWS_SESSION_TOKEN', 'AWS_PROFILE', 'AWS_WEB_IDENTITY_TOKEN_FILE', 'AWS_ROLE_ARN',
@@ -39,7 +40,7 @@ def child_env(env):
 def preflight(env):
     """Return why the environment is not the emulator's, or None."""
     for name in REAL_CREDENTIALS:
-        if env.get(name):
+        if name in env:
             return f'{name} is set'
     if not env.get('AWS_ACCESS_KEY_ID', '').startswith('EMULATOR'):
         return 'AWS_ACCESS_KEY_ID is not an emulator key'
@@ -182,11 +183,14 @@ def run_cloudformation(entry, root, env, gaps, key):
             command += ['--parameter-overrides', *(f'{name}={value}' for name, value in entry['parameters'].items())]
         env = {**env, 'PATH': os.pathsep.join([str(SHIMS), env['PATH']]), 'API_CHECK_SCRIPT': key}
         log = common.log_path(f"aws-cloudformation-{entry['exercise']}.log")
-        code = run_group(command, log, directory / entry['working_directory'], SCRIPT_TIMEOUT, env)
+        code = run_group(command, log, directory / entry['working_directory'], DEPLOY_TIMEOUT, env)
     calls = raw_calls(key)
     if code not in (0, None) and calls and not calls[-1]['timed_out']:
         calls[-1]['stderr'] = stack_failures(env, entry['stack_name']) + calls[-1]['stderr']
-    write_rows(classify.classify_script(entry['exercise'], key, calls, gaps))
+    rows = classify.classify_script(entry['exercise'], key, calls, gaps)
+    if code is None:  # killed before the shim could record it: a deploy is a waiting call
+        rows[-1].update(status='not-covered', error='timeout', reason=None)
+    write_rows(rows)
 
 
 def run_terraform(entry, root, env, gaps, key):
@@ -199,12 +203,13 @@ def run_terraform(entry, root, env, gaps, key):
             common.write_row(cloud='aws', exercise=exercise, layer='emulator', target=key, check='apply',
                              status='drift', error=f'init: {error}')
             return
-        graph = subprocess.run(['terraform', 'graph'], cwd=directory, env=env, stdin=subprocess.DEVNULL,
-                               capture_output=True, text=True, timeout=STEP_TIMEOUT)
+        graph_log = common.log_path(f'aws-terraform-graph-{exercise}.log')
+        graph_code = run_group(['terraform', 'graph'], graph_log, directory, STEP_TIMEOUT, env)
+        graph = graph_log.read_text(errors='replace') if graph_code == 0 else ''
         code = run_group(['terraform', 'apply', '-auto-approve', '-json', '-input=false'], log, directory,
                          TERRAFORM_TIMEOUT, env)
         lines = log.read_text(errors='replace').splitlines()
-    write_rows(classify.classify_terraform(exercise, lines, graph.stdout, gaps, timed_out=code is None))
+    write_rows(classify.classify_terraform(exercise, lines, graph, gaps, timed_out=code is None))
 
 
 def run_target(entry, root, env, gaps):
@@ -240,6 +245,7 @@ def main(argv=None, root=REPO_ROOT):
             common.write_row(cloud='aws', layer='emulator', target='preflight', check='preflight',
                              status='infrastructure', error=problem)
             return 0
+    common.raw_log_path().unlink(missing_ok=True)
     for entry in entries:
         target, check, layer = key_of(entry)
         where = dict(cloud='aws', exercise=entry['exercise'], layer=layer)

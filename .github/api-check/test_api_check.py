@@ -3,6 +3,7 @@ import os
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -941,13 +942,13 @@ case "$1" in
   sts) echo "${FAKE_ACCOUNT:-000000000000}" ;;
   s3) echo "NotImplemented: s3" >&2; exit 254 ;;
   cloudformation)
-    if [ "$2" = deploy ]; then echo "Failed to create the stack" >&2; exit 255; fi
+    if [ "$2" = deploy ]; then [ -n "$DEPLOY_SLEEP" ] && exec sleep "$DEPLOY_SLEEP"; echo "Failed to create the stack" >&2; exit 255; fi
     echo "Handler NotImplemented in the emulator" ;;
 esac
 '''
 FAKE_TERRAFORM = '''echo "$PWD $1 $AWS_ENDPOINT_URL" >> "$OUT/terraform-calls"
 case "$1" in
-  graph) echo "digraph {}" ;;
+  graph) [ -n "$GRAPH_FAIL" ] && { echo graph-broken >&2; exit 1; }; echo "digraph {}" ;;
   apply) [ -n "$APPLY_SLEEP" ] && sleep "$APPLY_SLEEP"; echo '{"type":"diagnostic","diagnostic":{"severity":"error","summary":"Bad","detail":"d","address":"aws_x.y"}}'; exit 1 ;;
 esac
 '''
@@ -1112,6 +1113,70 @@ def test_terraform_apply_timeout_is_killed_and_classified(aws_env, monkeypatch):
     assert [(row['status'], row['error']) for row in rows] == [('drift', 'timeout')]
 
 
+CFN_ENTRY = {'exercise': '12', 'kind': 'cloudformation', 'directory': '12-faas', 'working_directory': 'aws',
+             'template': 'template.yaml', 'stack_name': 'cloud-x', 'capabilities': ['CAPABILITY_IAM']}
+
+
+def test_deploy_timeout_in_the_shim_is_not_covered(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'12-faas/aws/template.yaml': 'x'})
+    monkeypatch.setenv('DEPLOY_SLEEP', '30')
+    monkeypatch.setenv('API_CHECK_AWS_TIMEOUT', '1')
+    assert run_aws_targets.DEPLOY_TIMEOUT > 600
+    monkeypatch.setattr(run_aws_targets, 'DEPLOY_TIMEOUT', 20)
+    run_aws(monkeypatch, repo, [CFN_ENTRY])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert {row['status'] for row in rows} == {'not-covered'}
+    assert 'timeout' in {row['error'] for row in rows}
+
+
+def test_deploy_killed_by_the_runner_is_not_covered_never_ok(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'12-faas/aws/template.yaml': 'x'})
+    monkeypatch.setenv('DEPLOY_SLEEP', '3')
+    monkeypatch.setattr(run_aws_targets, 'DEPLOY_TIMEOUT', 1)
+    run_aws(monkeypatch, repo, [CFN_ENTRY])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error']) for row in rows] == [('not-covered', 'timeout')]
+
+
+def test_script_timeout_kills_the_process_group_and_is_drift(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'sleep 30 &\necho $! > "$OUT/pid"\nsleep 30\n'})
+    monkeypatch.setattr(run_aws_targets, 'SCRIPT_TIMEOUT', 1)
+    run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error']) for row in rows] == [('drift', 'timeout')]
+    pid = int((out / 'pid').read_text())
+    for _ in range(50):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(pid, 9)
+        pytest.fail('background child outlived the script')
+
+
+def test_raw_log_of_an_earlier_run_is_not_counted(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'true\n'})
+    common.write_raw_call('2-iaas/aws/a.sh', '1', ['aws', 's3', 'ls'], 1, 'NotImplemented', False)
+    run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
+    assert [row['status'] for row in common.read_rows() if row['status'] != 'pending'] == ['ok']
+
+
+def test_terraform_graph_failure_is_logged_and_classification_goes_on(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'14-vm/aws/main.tf': 'x'})
+    entry = {'exercise': '14', 'kind': 'terraform', 'directory': '14-vm', 'working_directory': 'aws'}
+    monkeypatch.setenv('GRAPH_FAIL', '1')
+    run_aws(monkeypatch, repo, [entry])
+    assert ('aws_x.y', 'drift') in [(row['target'], row['status']) for row in common.read_rows()]
+    assert 'graph-broken' in common.log_path('aws-terraform-graph-14.log').read_text()
+
+
 @pytest.mark.parametrize('name', FORBIDDEN)
 def test_preflight_refuses_real_credential_variables(aws_env, monkeypatch, name):
     repo, out = aws_env
@@ -1123,6 +1188,8 @@ def test_preflight_refuses_real_credential_variables(aws_env, monkeypatch, name)
 
 
 @pytest.mark.parametrize('name, value', [
+    ('AWS_PROFILE', ''), ('AWS_ENDPOINT_URL', 'https://127.0.0.1.evil:9297'),
+    ('AWS_ENDPOINT_URL', 'https://localhost.example'), ('AWS_ENDPOINT_URL', 'https://127.0.0.1:٩٢٩٧'),
     ('AWS_ACCESS_KEY_ID', 'AKIAREAL'), ('AWS_ENDPOINT_URL', 'https://example.com:9297'),
     ('AWS_ENDPOINT_URL', 'http://127.0.0.1:9297'), ('FAKE_ACCOUNT', '123456789012')])
 def test_preflight_refuses_wrong_key_endpoint_or_account(aws_env, monkeypatch, name, value):
