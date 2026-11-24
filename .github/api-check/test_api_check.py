@@ -731,18 +731,18 @@ def test_script_501_is_not_covered_and_later_failures_consequential():
         _call(['s3', 'ls'], 0, line=6),
     ]
     rows = classify.classify_script('2', '2-iaas/aws/x.sh', calls, [])
-    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert _statuses(rows) == ['not-covered', 'consequential', 'not-covered']
     assert rows[0]['line'] == 3 and rows[0]['check'] == 'ec2 run-instances' and rows[0]['cloud'] == 'aws'
 
 
 def test_script_http_501_status_is_not_covered():
     calls = [_call(['iot', 'create-thing'], 254, 'Received response with status code 501')]
-    assert _statuses(classify.classify_script('6', 's.sh', calls, [])) == ['not-covered']
+    assert _statuses(classify.classify_script('6', 's.sh', calls, [])) == ['not-covered', 'not-covered']
 
 
 def test_script_other_error_is_drift_and_clean_script_is_ok():
     calls = [_call(['ec2', 'run-instances'], 252, 'Unknown options: --bogus')]
-    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift']
+    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift', 'drift']
     rows = classify.classify_script('2', 's.sh', [_call(['s3', 'ls'])], [])
     assert _statuses(rows) == ['ok'] and rows[0]['check'] == 'run'
 
@@ -753,17 +753,34 @@ def test_script_other_error_is_drift_and_clean_script_is_ok():
 ])
 def test_waiter_timeout_is_not_covered(argv):
     rows = classify.classify_script('3', 's.sh', [_call(argv, 124, '', timed_out=True)], [])
-    assert _statuses(rows) == ['not-covered']
+    assert _statuses(rows) == ['not-covered', 'not-covered']
 
 
 def test_other_timeout_is_drift_timeout():
     rows = classify.classify_script('3', 's.sh', [_call(['ec2', 'run-instances'], 124, '', timed_out=True)], [])
-    assert _statuses(rows) == ['drift'] and rows[0]['error'] == 'timeout'
+    assert _statuses(rows) == ['drift', 'drift'] and rows[0]['error'] == 'timeout'
 
 
 def test_waiter_api_error_is_classified_from_the_error():
     calls = [_call(['ec2', 'wait', 'instance-running'], 255, 'Waiter failed: InvalidInstanceID')]
-    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift']
+    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift', 'drift']
+
+
+def test_closing_row_is_worst_status_on_the_script_key():
+    calls = [_call(['s3', 'ls'], 252, 'Unknown options', line=2),
+             _call(['ec2', 'run-instances'], 254, 'NotImplemented', line=3)]
+    rows = classify.classify_script('2', 's.sh', calls, [])
+    assert _statuses(rows) == ['drift', 'not-covered', 'drift']
+    closing = rows[-1]
+    assert (closing['target'], closing['check'], closing['file'], closing['line']) == ('s.sh', 'run', None, None)
+    assert closing['error'] == '2 calls failed'
+    only_501 = classify.classify_script('6', 's.sh', [_call(['iot', 'x'], 254, 'status code 501')], [])[-1]
+    assert only_501['status'] == 'not-covered' and only_501['error'] == '1 calls failed'
+
+
+def test_consequential_does_not_raise_the_closing_row():
+    calls = [_call(['a', 'b'], 254, 'NotImplemented'), _call(['c', 'd'], 254, 'boom')]
+    assert classify.classify_script('2', 's.sh', calls, [])[-1]['status'] == 'not-covered'
 
 
 def test_emulator_gap_match_is_not_covered_with_reason():
@@ -774,7 +791,7 @@ def test_emulator_gap_match_is_not_covered_with_reason():
         _call(['rds', 'describe-db-instances'], 254, 'DBInstanceNotFound', line=5),
     ]
     rows = classify.classify_script('7', 's.sh', calls, gaps)
-    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert _statuses(rows) == ['not-covered', 'consequential', 'not-covered']
     assert rows[0]['reason'] == 'emulator rejects the engine version'
 
 
@@ -782,16 +799,23 @@ def test_gap_for_another_exercise_or_cloud_does_not_match():
     calls = [_call(['rds', 'create-db-instance'], 254, 'InvalidParameterValue')]
     for gap in ({'exercise': '8', 'cloud': 'aws', 'target': 'rds', 'reason': 'r'},
                 {'exercise': '7', 'target': 'rds', 'reason': 'r'}):
-        assert _statuses(classify.classify_script('7', 's.sh', calls, [gap])) == ['drift']
+        assert _statuses(classify.classify_script('7', 's.sh', calls, [gap])) == ['drift', 'drift']
 
 
 def test_passing_call_matching_gap_is_newly_covered():
     gaps = [{'exercise': '7', 'cloud': 'aws', 'target': 'rds create-db-instance', 'reason': 'was rejected'}]
     rows = classify.classify_script('7', 's.sh', [_call(['rds', 'create-db-instance'], 0, line=4)], gaps)
-    assert _statuses(rows) == ['newly-covered', 'ok'] and rows[0]['line'] == 4
+    assert _statuses(rows) == ['newly-covered', 'newly-covered'] and rows[0]['line'] == 4
+    assert rows[1]['line'] is None and rows[1]['error'] is None
 
 
 SAMPLE_ERROR = 'start\nrun_sample has caught an error. Table x is not supported\n'
+
+
+def test_sample_gap_matches_only_text_after_the_marker():
+    out = 'not supported yet, skipping\nrun_sample has caught an error. Bad request\n'
+    gaps = [{'exercise': '9', 'cloud': 'aws', 'pattern': 'not supported', 'reason': 'r'}]
+    assert classify.classify_sample_output('9', out, gaps)['status'] == 'drift'
 
 
 def test_sample_marker_is_drift_unless_gap_matches():
@@ -829,7 +853,9 @@ def test_terraform_dependent_error_is_consequential_independent_is_drift():
         ('data.aws_ssm_parameter.ubuntu', 'not-covered'),
         ('aws_instance.web', 'consequential'),
         ('aws_s3_bucket.other', 'drift'),
+        ('terraform apply', 'drift'),
     ]
+    assert rows[-1]['error'] == '3 errors'
 
 
 def test_terraform_gap_error_is_not_covered_with_reason_and_seeds_consequential():
@@ -838,7 +864,7 @@ def test_terraform_gap_error_is_not_covered_with_reason_and_seeds_consequential(
     lines = [_diag('data.aws_ssm_parameter.ubuntu', 'reading', 'ParameterNotFound'),
              _diag('aws_instance.web', 'creating', 'x')]
     rows = classify.classify_terraform('14', lines, GRAPH, gaps)
-    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert _statuses(rows) == ['not-covered', 'consequential', 'not-covered']
     assert rows[0]['reason'] == 'public parameter missing'
 
 
@@ -847,8 +873,20 @@ def test_terraform_success_is_one_ok_row_and_gap_that_passed_is_newly_covered():
     lines = [json.dumps({'type': 'apply_complete', 'hook': {'resource': {'addr': 'data.aws_iot_endpoint.e'}}}),
              json.dumps({'type': 'apply_complete', 'hook': {'resource': {'addr': 'aws_s3_bucket.b'}}})]
     rows = classify.classify_terraform('15', lines, GRAPH, gaps)
-    assert _statuses(rows) == ['newly-covered', 'ok']
+    assert _statuses(rows) == ['newly-covered', 'newly-covered']
+    assert rows[-1]['target'] == 'terraform apply'
     assert rows[0]['target'] == 'data.aws_iot_endpoint.e'
+
+
+def test_terraform_error_without_address_is_classified_on_the_configuration_key():
+    def bare(summary, detail=''):
+        return json.dumps({'type': 'diagnostic', 'diagnostic': {'severity': 'error', 'summary': summary,
+                                                                 'detail': detail}})
+    rows = classify.classify_terraform('14', [bare('Invalid provider configuration')], GRAPH, [])
+    assert _statuses(rows) == ['drift', 'drift']
+    assert rows[-1]['target'] == 'terraform apply' and rows[-1]['check'] == 'apply'
+    rows = classify.classify_terraform('14', [bare('x', 'NotImplemented')], GRAPH, [])
+    assert rows[-1]['status'] == 'not-covered'
 
 
 def test_terraform_ignores_warnings_and_non_json_lines():

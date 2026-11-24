@@ -1,7 +1,8 @@
 # Every skip and emulator gap needs a reason.
 # emulator_gaps entries: exercise, reason, and a pattern (message or error code) and/or a target; for the AWS
 # job also `cloud: aws`, `target` (regex on the call `<service> <operation> <args>` or the Terraform address),
-# optional `link`. An entry without a target applies to the exercise 9 boto3 sample's message.
+# optional `link`. The exercise 9 boto3 sample's message is matched by `pattern` alone; an entry with only a
+# `target` applies to calls, never to the sample.
 skip: []
 emulator_gaps: []
 python:

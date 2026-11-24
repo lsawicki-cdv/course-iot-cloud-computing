@@ -67,8 +67,9 @@ def classify_sample(returncode, stdout, gaps):
     if returncode == 0 and SAMPLE_MARKER not in stdout:
         return 'ok', None, None
     error = last_line(stdout) if returncode != 0 else stdout[stdout.index(SAMPLE_MARKER):].splitlines()[0]
+    caught = stdout[stdout.index(SAMPLE_MARKER):] if SAMPLE_MARKER in stdout else stdout
     for gap in gaps:
-        if re.search(gap['pattern'], stdout):
+        if re.search(gap['pattern'], caught):
             return 'not-covered', error, gap['reason']
     return 'drift', error, None
 

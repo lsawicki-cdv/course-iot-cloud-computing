@@ -36,9 +36,17 @@ def _first_line(text):
     return next((line for line in text.splitlines() if line.strip()), '')
 
 
+_RANK = {'ok': 0, 'newly-covered': 1, 'not-covered': 2, 'drift': 3}
+
+
+def _worst(rows):
+    """Worst status of the rows; `consequential` rows do not raise it."""
+    return max((row['status'] for row in rows), key=lambda status: _RANK.get(status, 0), default='ok')
+
+
 def classify_script(exercise, script, calls, gaps):
-    """Rows for the failing calls of one script (raw-log entries), newly-covered gaps and, when nothing
-    failed, one `ok` row with check `run`."""
+    """Rows for the failing calls of one script (raw-log entries) and newly-covered gaps, then one closing
+    row with check `run` (the pending row's key) holding the worst status."""
     gaps = _aws_gaps(gaps, exercise)
     rows = []
     seen_not_covered = False
@@ -68,8 +76,8 @@ def classify_script(exercise, script, calls, gaps):
             status = 'consequential'
         seen_not_covered = seen_not_covered or status == 'not-covered'
         rows.append(_row(exercise, status, script, check, script, call['line'], error, reason))
-    if not any(row['status'] != 'newly-covered' for row in rows):
-        rows.append(_row(exercise, 'ok', script, 'run'))
+    failures = sum(row['status'] not in ('newly-covered', 'ok') for row in rows)
+    rows.append(_row(exercise, _worst(rows), script, 'run', error=f'{failures} calls failed' if failures else None))
     return rows
 
 
@@ -133,7 +141,7 @@ def classify_terraform(exercise, apply_lines, graph_dot, gaps, timed_out=False):
     gaps = _aws_gaps(gaps, exercise)
     if timed_out:
         return [_row(exercise, 'drift', 'terraform apply', 'apply', error='timeout')]
-    errors = [(diag['address'], f"{diag.get('summary', '')}: {diag.get('detail', '')}", diag)
+    errors = [(diag.get('address') or 'terraform apply', f"{diag.get('summary', '')}: {diag.get('detail', '')}", diag)
               for diag in _diagnostics(apply_lines)]
     statuses = {}
     for address, text, _ in errors:
@@ -154,6 +162,8 @@ def classify_terraform(exercise, apply_lines, graph_dot, gaps, timed_out=False):
         for gap in gaps:
             if gap.get('target') and address not in failed and re.search(gap['target'], address):
                 rows.append(_row(exercise, 'newly-covered', address, 'apply', reason=gap['reason']))
-    if not errors:
-        rows.append(_row(exercise, 'ok', 'terraform apply', 'apply'))
+    # Closing row on the configuration's key; an address-less error already sits there and keeps its text.
+    own = next((row for row in rows if row['target'] == 'terraform apply' and row['status'] != 'newly-covered'), None)
+    error = own['error'] if own else (f'{len(errors)} errors' if errors else None)
+    rows.append(_row(exercise, _worst(rows), 'terraform apply', 'apply', error=error))
     return rows
