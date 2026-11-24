@@ -22,7 +22,9 @@ jobs:
       - id: install-az
         name: Install the Azure CLI and Bicep
         run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          script="$(mktemp)"
+          curl -fsSL -o "$script" https://aka.ms/InstallAzureCLIDeb
+          sudo bash "$script"
           az bicep install
       - id: install-terraform
         name: Install Terraform
@@ -108,20 +110,15 @@ jobs:
             sleep 1
           done
           curl -fsS --cacert "$dir/ca.pem" https://127.0.0.1:9297/__admin/health > /dev/null
-          key="$("$API_CHECK_PYTHON" -I - "$dir/emulator_credentials" aws_access_key_id <<'PY'
+          credentials="$("$API_CHECK_PYTHON" -I - "$dir/emulator_credentials" <<'PY'
           import configparser, sys
           parser = configparser.ConfigParser()
           parser.read(sys.argv[1])
-          print(next(s[sys.argv[2]] for s in parser.values() if sys.argv[2] in s))
+          values = {k: v for section in parser.values() for k, v in section.items()}
+          print(values['aws_access_key_id'], values['aws_secret_access_key'])
           PY
           )"
-          secret="$("$API_CHECK_PYTHON" -I - "$dir/emulator_credentials" aws_secret_access_key <<'PY'
-          import configparser, sys
-          parser = configparser.ConfigParser()
-          parser.read(sys.argv[1])
-          print(next(s[sys.argv[2]] for s in parser.values() if sys.argv[2] in s))
-          PY
-          )"
+          read -r key secret <<< "$credentials"
           echo "::add-mask::$secret"
           {
             echo "AWS_CONFIG_FILE=$dir/config"

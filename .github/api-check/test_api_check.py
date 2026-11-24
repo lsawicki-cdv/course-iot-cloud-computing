@@ -1291,3 +1291,17 @@ def test_workflow_emulator_command():
     assert '-p 9297' in command and '-t off' in command
     assert not re.search(r'\s-b\b|\s-a off', command)
     assert re.search(r'unset .*AWS_SESSION_TOKEN', run)
+
+
+def test_workflow_curl_fails_on_http_errors():
+    runs = [step['run'] for job in workflow()['jobs'].values() for step in job['steps'] if 'run' in step]
+    calls = [line for run in runs for line in run.splitlines() if re.search(r'\bcurl\b', line)]
+    assert calls
+    assert all(re.search(r'\s(-[a-zA-Z]*f[a-zA-Z]*|--fail)\b', line) for line in calls)
+    assert not any('| sudo bash' in line or '| bash' in line for line in calls)
+
+
+def test_workflow_emulator_reads_credentials_in_one_call():
+    run = step_by_id('aws', 'emulator')['run']
+    assert run.count('import configparser') == 1
+    assert run.index('::add-mask::') < run.index('>> "$GITHUB_ENV"')
