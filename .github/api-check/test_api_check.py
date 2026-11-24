@@ -420,3 +420,146 @@ def test_azure_main_writes_pending_then_rows(tmp_path, monkeypatch):
     assert seen == [['pending'], ['pending', 'pending']]
     statuses = {row['exercise']: row['status'] for row in common.read_rows()}
     assert statuses == {'12': 'pending', '14': 'infrastructure'}
+
+
+class FakeRun:
+    """Stands in for subprocess.run: handlers map the command's first words to a reply or an exception."""
+
+    def __init__(self, **handlers):
+        self.handlers = handlers
+        self.calls = []
+
+    def __call__(self, command, **kwargs):
+        self.calls.append(command)
+        for prefix, reply in self.handlers.items():
+            if ' '.join(command).startswith(prefix):
+                if isinstance(reply, Exception):
+                    raise reply
+                if callable(reply):
+                    reply = reply(command, kwargs)
+                return reply
+        return subprocess.CompletedProcess(command, 0, b'', b'')
+
+    def ran(self, prefix):
+        return [call for call in self.calls if ' '.join(call).startswith(prefix)]
+
+
+def reply(stdout='', returncode=0, stderr=''):
+    return subprocess.CompletedProcess([], returncode, stdout, stderr)
+
+
+def timeout(*_):
+    return subprocess.TimeoutExpired('x', 1)
+
+
+def logged(text, returncode):
+    """Reply of a command run through run_logged: writes text to the stdout file."""
+    def run(command, kwargs):
+        kwargs['stdout'].write(text)
+        return reply(returncode=returncode)
+    return run
+
+
+TERRAFORM = {'exercise': '14', 'kind': 'terraform', 'directory': '14-y'}
+COSMOS = {'exercise': '9', 'kind': 'cosmos', 'directory': '9-z'}
+
+
+def run_one(entry, monkeypatch, tmp_path, fake, gaps=()):
+    """Run main for one entry with subprocess.run faked; return the final rows."""
+    monkeypatch.setattr(common, 'load_targets', lambda: {'azure': [entry]})
+    monkeypatch.setattr(run_azure_targets.subprocess, 'run', fake)
+    monkeypatch.setattr(run_azure_targets.time, 'sleep', lambda _: None)
+    assert run_azure_targets.main([], root=tmp_path) == 0
+    rows = common.read_rows()
+    assert not [row for row in rows if row['status'] == 'pending']
+    return rows
+
+
+def test_terraform_init_failure_closes_pending_row(tmp_path, monkeypatch):
+    fake = FakeRun(**{'terraform init': logged('Error: no provider\n', 1)})
+    rows = run_one(TERRAFORM, monkeypatch, tmp_path, fake)
+    assert [(row['target'], row['check'], row['status']) for row in rows] == [('terraform validate', 'validate', 'drift')]
+    assert rows[0]['error'].startswith('init: ') and 'no provider' in rows[0]['error']
+    assert not fake.ran('terraform validate')
+
+
+def test_terraform_init_timeout_closes_pending_row(tmp_path, monkeypatch):
+    fake = FakeRun(**{'terraform init': timeout()})
+    rows = run_one(TERRAFORM, monkeypatch, tmp_path, fake)
+    assert [(row['target'], row['status'], row['error']) for row in rows] == [
+        ('terraform validate', 'drift', 'init: timeout')]
+
+
+def test_terraform_validate_errors_rows_and_log(tmp_path, monkeypatch):
+    text = terraform_json(diagnostic('main.tf', 4, 'Unsupported argument'), diagnostic('x.tf', 9, 'Bad block'))
+    fake = FakeRun(**{'terraform init': logged('init output\n', 0), 'terraform validate': reply(text)})
+    rows = run_one(TERRAFORM, monkeypatch, tmp_path, fake)
+    assert sorted((row['file'], row['line']) for row in rows if row['file']) == [('14-y/main.tf', 4), ('14-y/x.tf', 9)]
+    assert [row['error'] for row in rows if row['file'] is None] == ['2 validation errors']
+    log = common.log_path('azure-terraform-14.log').read_text()
+    assert 'init output' in log and 'Unsupported argument' in log
+
+
+def test_terraform_validate_timeout_closes_pending_row(tmp_path, monkeypatch):
+    fake = FakeRun(**{'terraform init': logged('', 0), 'terraform validate': timeout()})
+    rows = run_one(TERRAFORM, monkeypatch, tmp_path, fake)
+    assert [(row['target'], row['status'], row['error']) for row in rows] == [
+        ('terraform validate', 'drift', 'timeout')]
+
+
+@pytest.fixture
+def cosmos_venv(tmp_path):
+    python = tmp_path / 'api-check' / 'venvs' / '9-z' / 'bin' / 'python'
+    python.parent.mkdir(parents=True)
+    python.write_text('')
+
+
+def cosmos_row(rows):
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_cosmos_docker_run_timeout_removes_container(tmp_path, monkeypatch, cosmos_venv):
+    fake = FakeRun(**{'docker run': timeout()})
+    row = cosmos_row(run_one(COSMOS, monkeypatch, tmp_path, fake))
+    assert row['status'] == 'infrastructure'
+    name = fake.ran('docker run')[0][fake.ran('docker run')[0].index('--name') + 1]
+    assert ['docker', 'rm', '-f', name] in fake.calls
+
+
+def test_cosmos_probe_timeout_keeps_polling(tmp_path, monkeypatch, cosmos_venv):
+    answers = iter([timeout(), reply(returncode=1), reply()])
+
+    def probe(command, kwargs):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+    fake = FakeRun(**{'docker run': reply('abc\n'), str(tmp_path / 'api-check/venvs/9-z/bin/python') + ' -I': probe,
+                      str(tmp_path / 'api-check/venvs/9-z/bin/python') + ' azure': logged('run_sample done\n', 0)})
+    row = cosmos_row(run_one(COSMOS, monkeypatch, tmp_path, fake))
+    assert row['status'] == 'ok'
+    assert fake.ran('docker rm -f')
+
+
+def test_cosmos_probe_never_ready_is_infrastructure(tmp_path, monkeypatch, cosmos_venv):
+    fake = FakeRun(**{'docker run': reply('abc\n'), str(tmp_path / 'api-check/venvs/9-z/bin/python') + ' -I': timeout()})
+    row = cosmos_row(run_one(COSMOS, monkeypatch, tmp_path, fake))
+    assert row['status'] == 'infrastructure' and 'not ready' in row['error']
+    assert len(fake.ran(str(tmp_path / 'api-check/venvs/9-z/bin/python') + ' -I')) == run_azure_targets.PROBE_TRIES
+    assert fake.ran('docker rm -f')
+
+
+@pytest.mark.parametrize('output, code, status', [
+    ('run_sample has caught an error. Bad\nrun_sample done\n', 0, 'drift'),
+    ('Traceback\nValueError: x\n', 1, 'drift'),
+    ('', None, 'drift'),
+])
+def test_cosmos_sample_failures_remove_container(tmp_path, monkeypatch, cosmos_venv, output, code, status):
+    python = str(tmp_path / 'api-check/venvs/9-z/bin/python')
+    sample = timeout() if code is None else logged(output, code)
+    fake = FakeRun(**{'docker run': reply('abc\n'), python + ' azure': sample})
+    row = cosmos_row(run_one(COSMOS, monkeypatch, tmp_path, fake))
+    assert row['status'] == status
+    removal = fake.ran('docker rm -f')
+    assert removal and removal[0][-1] == fake.ran('docker run')[0][fake.ran('docker run')[0].index('--name') + 1]

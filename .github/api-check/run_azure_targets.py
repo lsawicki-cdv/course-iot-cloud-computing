@@ -108,7 +108,9 @@ def run_terraform(entry, root, where):
         code = run_logged(['terraform', 'init', '-backend=false', '-input=false'], log, directory, BUILD_TIMEOUT)
         if code != 0:
             error = 'timeout' if code is None else last_line(log.read_text(errors='replace'))
-            common.write_row(target='terraform init', check='init', status='drift', error=error, **where)
+            # Keyed as the pending row, so it is closed.
+            common.write_row(target='terraform validate', check='validate', status='drift',
+                             error=f'init: {error}', **where)
             return
         try:
             done = subprocess.run(['terraform', 'validate', '-json'], cwd=directory, stdin=subprocess.DEVNULL,
@@ -116,7 +118,8 @@ def run_terraform(entry, root, where):
         except subprocess.TimeoutExpired:
             common.write_row(target='terraform validate', check='validate', status='drift', error='timeout', **where)
             return
-        log.write_text(done.stdout, encoding='utf-8')
+        with open(log, 'a', encoding='utf-8') as output:
+            output.write(done.stdout)
     rows = classify_terraform(done.stdout)
     for target, status, error in rows:
         if status == 'ok' or target == 'terraform validate':
@@ -132,6 +135,19 @@ def run_terraform(entry, root, where):
                          error=f'{len(rows)} validation errors', **where)
 
 
+def wait_ready(python, env):
+    """Poll the emulator; a probe that times out counts as not ready."""
+    for _ in range(PROBE_TRIES):
+        try:
+            if subprocess.run([str(python), '-I', '-c', PROBE], env=env, capture_output=True,
+                              timeout=60).returncode == 0:
+                return True
+        except subprocess.TimeoutExpired:
+            pass
+        time.sleep(PROBE_INTERVAL)
+    return False
+
+
 def run_cosmos(entry, root, where, gaps):
     target = 'azure-cosmosdb-sample.py'
     python = common.base_dir() / 'venvs' / entry['directory'] / 'bin' / 'python'
@@ -141,20 +157,20 @@ def run_cosmos(entry, root, where, gaps):
         return
     env = {**os.environ, 'ACCOUNT_HOST': EMULATOR_HOST, 'ACCOUNT_KEY': EMULATOR_KEY,
            'PYTHONDONTWRITEBYTECODE': '1'}
-    started = subprocess.run(['docker', 'run', '-d', '-p', '127.0.0.1:8081:8081', EMULATOR_IMAGE],
-                             capture_output=True, text=True, timeout=BUILD_TIMEOUT)
-    if started.returncode != 0:
-        common.write_row(target=target, check='run', status='infrastructure',
-                         error=last_line(started.stderr) or 'docker run failed', **where)
-        return
-    container = started.stdout.strip()
+    name = f'api-check-cosmos-{os.getpid()}'
     try:
-        for attempt in range(PROBE_TRIES):
-            probe = subprocess.run([str(python), '-I', '-c', PROBE], env=env, capture_output=True, timeout=60)
-            if probe.returncode == 0:
-                break
-            time.sleep(PROBE_INTERVAL)
-        else:
+        try:
+            started = subprocess.run(['docker', 'run', '-d', '--name', name, '-p', '127.0.0.1:8081:8081',
+                                      EMULATOR_IMAGE], capture_output=True, text=True, timeout=BUILD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            common.write_row(target=target, check='run', status='infrastructure',
+                             error='docker run timeout', **where)
+            return
+        if started.returncode != 0:
+            common.write_row(target=target, check='run', status='infrastructure',
+                             error=last_line(started.stderr) or 'docker run failed', **where)
+            return
+        if not wait_ready(python, env):
             common.write_row(target=target, check='run', status='infrastructure',
                              error='emulator not ready after 5 min', **where)
             return
@@ -166,7 +182,7 @@ def run_cosmos(entry, root, where, gaps):
         status, error, reason = classify_sample(code, log.read_text(errors='replace'), gaps)
         common.write_row(target=target, check='run', status=status, error=error, reason=reason, **where)
     finally:
-        subprocess.run(['docker', 'rm', '-f', container], capture_output=True)
+        subprocess.run(['docker', 'rm', '-f', name], capture_output=True, timeout=60)
 
 
 def pending_target(entry):
