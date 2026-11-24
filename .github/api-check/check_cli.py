@@ -132,7 +132,8 @@ def extract_line(line, number):
                 rest = segment[index + 1:]
                 words = command_words(token, rest)
                 if words:
-                    flags = [m.group(1) for m in map(FLAG_TOKEN.match, rest[words == ('--version',):]) if m]
+                    args = rest[1:] if words == ('--version',) else rest
+                    flags = [m.group(1) for m in map(FLAG_TOKEN.match, args) if m]
                     yield Command(token, words, flags, number)
                 break
 
@@ -160,6 +161,11 @@ def run_help(argv):
     done = subprocess.run(argv, shell=False, timeout=HELP_TIMEOUT, stdin=subprocess.DEVNULL, capture_output=True,
                           text=True, env=env)
     return done.returncode, done.stdout + done.stderr
+
+
+def flag_listed(flag, known):
+    """A flag exists when listed, or when it is a prefix of exactly one listed flag (as both CLIs accept)."""
+    return flag in known or sum(other.startswith(flag) for other in known) == 1
 
 
 def exercise_of(name):
@@ -213,7 +219,7 @@ def run(cloud, files, root, skip):
             if flag_target in skipped:
                 common.write_row(target=flag_target, check='flag', status='skipped', reason=skipped[flag_target],
                                  **where)
-            elif flag not in known:
+            elif not flag_listed(flag, known):
                 counts['missing'] += 1
                 common.write_row(target=flag_target, check='flag', status='missing-flag', **where)
     return counts

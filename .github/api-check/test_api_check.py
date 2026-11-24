@@ -166,3 +166,13 @@ def test_run_with_missing_rows_exits_zero(tmp_path, fake_cli):
     (tmp_path / 'x.md').write_text('```bash\naws bogus thing\n```\n')
     assert check_cli.main(['--cloud', 'aws'], root=tmp_path, files=['x.md']) == 0
     assert common.read_rows()[0]['status'] == 'missing-command'
+
+
+def test_flag_prefixes(tmp_path, fake_cli):
+    text = ('```bash\naz prefixed op --destination-port-range p --destination-port-rangezz p --start s '
+            '--start-ip s\n```\n')
+    rows = run_static(tmp_path, 'azure', text)
+    assert ('az prefixed op --destination-port-range', 'flag') not in rows
+    assert rows['az prefixed op --destination-port-rangezz', 'flag']['status'] == 'missing-flag'
+    assert rows['az prefixed op --start', 'flag']['status'] == 'missing-flag'
+    assert ('az prefixed op --start-ip', 'flag') not in rows

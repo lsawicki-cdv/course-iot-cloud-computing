@@ -9,4 +9,7 @@ with open(os.environ['FAKE_CLI_LOG'], 'a', encoding='utf-8') as log:
 if 'bogus' in sys.argv:
     print('invalid choice: bogus', file=sys.stderr)
     sys.exit(252 if os.path.basename(sys.argv[0]) == 'aws' else 2)
-print('usage: fake [options]\n  --region  --name  --output')
+flags = '--region  --name  --output'
+if 'prefixed' in sys.argv:
+    flags = '--destination-port-ranges  --start-ip-address  --start-time'
+print(f'usage: fake [options]\n  {flags}')
