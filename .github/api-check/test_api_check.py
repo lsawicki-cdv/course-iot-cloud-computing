@@ -10,6 +10,7 @@ import yaml
 
 import check_cli
 import check_python
+import classify
 import run_azure_targets
 import common
 import summary
@@ -710,3 +711,179 @@ def test_psql_shim_exits_two_and_calls_nothing(shim_env):
     result = run_shim('psql', shim_env, '-h', 'db')
     assert result.returncode == 2
     assert real_calls(shim_env) == []
+
+
+# --- AWS classification (T7) ---
+
+def _call(argv, exit_code=0, stderr='', timed_out=False, line=1, script='2-iaas/aws/x.sh'):
+    return {'script': script, 'line': line, 'argv': argv, 'exit': exit_code, 'stderr': stderr,
+            'timed_out': timed_out}
+
+
+def _statuses(rows):
+    return [row['status'] for row in rows]
+
+
+def test_script_501_is_not_covered_and_later_failures_consequential():
+    calls = [
+        _call(['ec2', 'run-instances'], 254, 'An error occurred (NotImplemented) when calling the RunInstances', line=3),
+        _call(['ec2', 'describe-instances'], 254, 'An error occurred (InvalidInstanceID)', line=5),
+        _call(['s3', 'ls'], 0, line=6),
+    ]
+    rows = classify.classify_script('2', '2-iaas/aws/x.sh', calls, [])
+    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert rows[0]['line'] == 3 and rows[0]['check'] == 'ec2 run-instances' and rows[0]['cloud'] == 'aws'
+
+
+def test_script_http_501_status_is_not_covered():
+    calls = [_call(['iot', 'create-thing'], 254, 'Received response with status code 501')]
+    assert _statuses(classify.classify_script('6', 's.sh', calls, [])) == ['not-covered']
+
+
+def test_script_other_error_is_drift_and_clean_script_is_ok():
+    calls = [_call(['ec2', 'run-instances'], 252, 'Unknown options: --bogus')]
+    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift']
+    rows = classify.classify_script('2', 's.sh', [_call(['s3', 'ls'])], [])
+    assert _statuses(rows) == ['ok'] and rows[0]['check'] == 'run'
+
+
+@pytest.mark.parametrize('argv', [
+    ['elbv2', 'wait', 'target-in-service', '--target-group-arn', 'x'],
+    ['cloudformation', 'deploy', '--stack-name', 's'],
+])
+def test_waiter_timeout_is_not_covered(argv):
+    rows = classify.classify_script('3', 's.sh', [_call(argv, 124, '', timed_out=True)], [])
+    assert _statuses(rows) == ['not-covered']
+
+
+def test_other_timeout_is_drift_timeout():
+    rows = classify.classify_script('3', 's.sh', [_call(['ec2', 'run-instances'], 124, '', timed_out=True)], [])
+    assert _statuses(rows) == ['drift'] and rows[0]['error'] == 'timeout'
+
+
+def test_waiter_api_error_is_classified_from_the_error():
+    calls = [_call(['ec2', 'wait', 'instance-running'], 255, 'Waiter failed: InvalidInstanceID')]
+    assert _statuses(classify.classify_script('2', 's.sh', calls, [])) == ['drift']
+
+
+def test_emulator_gap_match_is_not_covered_with_reason():
+    gaps = [{'exercise': '7', 'cloud': 'aws', 'target': r'^rds create-db-instance', 'pattern': 'InvalidParameter',
+             'reason': 'emulator rejects the engine version'}]
+    calls = [
+        _call(['rds', 'create-db-instance'], 254, 'An error occurred (InvalidParameterValue)', line=4),
+        _call(['rds', 'describe-db-instances'], 254, 'DBInstanceNotFound', line=5),
+    ]
+    rows = classify.classify_script('7', 's.sh', calls, gaps)
+    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert rows[0]['reason'] == 'emulator rejects the engine version'
+
+
+def test_gap_for_another_exercise_or_cloud_does_not_match():
+    calls = [_call(['rds', 'create-db-instance'], 254, 'InvalidParameterValue')]
+    for gap in ({'exercise': '8', 'cloud': 'aws', 'target': 'rds', 'reason': 'r'},
+                {'exercise': '7', 'target': 'rds', 'reason': 'r'}):
+        assert _statuses(classify.classify_script('7', 's.sh', calls, [gap])) == ['drift']
+
+
+def test_passing_call_matching_gap_is_newly_covered():
+    gaps = [{'exercise': '7', 'cloud': 'aws', 'target': 'rds create-db-instance', 'reason': 'was rejected'}]
+    rows = classify.classify_script('7', 's.sh', [_call(['rds', 'create-db-instance'], 0, line=4)], gaps)
+    assert _statuses(rows) == ['newly-covered', 'ok'] and rows[0]['line'] == 4
+
+
+SAMPLE_ERROR = 'start\nrun_sample has caught an error. Table x is not supported\n'
+
+
+def test_sample_marker_is_drift_unless_gap_matches():
+    assert classify.classify_sample_output('9', SAMPLE_ERROR, [])['status'] == 'drift'
+    gaps = [{'exercise': '9', 'cloud': 'aws', 'pattern': 'not supported', 'reason': 'no TTL'}]
+    row = classify.classify_sample_output('9', SAMPLE_ERROR, gaps)
+    assert row['status'] == 'not-covered' and row['reason'] == 'no TTL'
+    assert classify.classify_sample_output('9', 'all fine\n', gaps)['status'] == 'ok'
+
+
+def _diag(address, summary, detail=''):
+    return json.dumps({'@level': 'error', 'type': 'diagnostic', 'diagnostic': {
+        'severity': 'error', 'summary': summary, 'detail': detail, 'address': address}})
+
+
+GRAPH = '''digraph {
+  compound = "true"
+  subgraph "root" {
+    "[root] aws_instance.web (expand)" -> "[root] aws_security_group.sg (expand)"
+    "[root] aws_security_group.sg (expand)" -> "[root] data.aws_ssm_parameter.ubuntu (expand)"
+    "[root] aws_s3_bucket.other (expand)" -> "[root] provider[\\"registry.terraform.io/hashicorp/aws\\"]"
+    "[root] aws_instance.web (expand)" -> "[root] provider[\\"registry.terraform.io/hashicorp/aws\\"]"
+  }
+}'''
+
+
+def test_terraform_dependent_error_is_consequential_independent_is_drift():
+    lines = [
+        _diag('data.aws_ssm_parameter.ubuntu', 'reading SSM parameter', 'NotImplemented: 501'),
+        _diag('aws_instance.web', 'creating EC2 Instance', 'ImageNotFound'),
+        _diag('aws_s3_bucket.other', 'creating bucket', 'AccessDenied'),
+    ]
+    rows = classify.classify_terraform('14', lines, GRAPH, [])
+    assert [(row['target'], row['status']) for row in rows] == [
+        ('data.aws_ssm_parameter.ubuntu', 'not-covered'),
+        ('aws_instance.web', 'consequential'),
+        ('aws_s3_bucket.other', 'drift'),
+    ]
+
+
+def test_terraform_gap_error_is_not_covered_with_reason_and_seeds_consequential():
+    gaps = [{'exercise': '14', 'cloud': 'aws', 'target': r'^data\.aws_ssm_parameter\.ubuntu$',
+             'pattern': 'ParameterNotFound', 'reason': 'public parameter missing'}]
+    lines = [_diag('data.aws_ssm_parameter.ubuntu', 'reading', 'ParameterNotFound'),
+             _diag('aws_instance.web', 'creating', 'x')]
+    rows = classify.classify_terraform('14', lines, GRAPH, gaps)
+    assert _statuses(rows) == ['not-covered', 'consequential']
+    assert rows[0]['reason'] == 'public parameter missing'
+
+
+def test_terraform_success_is_one_ok_row_and_gap_that_passed_is_newly_covered():
+    gaps = [{'exercise': '15', 'cloud': 'aws', 'target': 'aws_iot_endpoint', 'reason': 'was missing'}]
+    lines = [json.dumps({'type': 'apply_complete', 'hook': {'resource': {'addr': 'data.aws_iot_endpoint.e'}}}),
+             json.dumps({'type': 'apply_complete', 'hook': {'resource': {'addr': 'aws_s3_bucket.b'}}})]
+    rows = classify.classify_terraform('15', lines, GRAPH, gaps)
+    assert _statuses(rows) == ['newly-covered', 'ok']
+    assert rows[0]['target'] == 'data.aws_iot_endpoint.e'
+
+
+def test_terraform_ignores_warnings_and_non_json_lines():
+    warning = json.dumps({'type': 'diagnostic', 'diagnostic': {'severity': 'warning', 'summary': 'w'}})
+    assert _statuses(classify.classify_terraform('14', ['not json', warning], GRAPH, [])) == ['ok']
+
+
+def test_terraform_timeout_is_drift_timeout():
+    rows = classify.classify_terraform('14', [], GRAPH, [], timed_out=True)
+    assert _statuses(rows) == ['drift'] and rows[0]['error'] == 'timeout'
+
+
+def test_aws_targets_scripts_exist_and_exclude_user_data():
+    targets = common.load_targets()['aws']
+    tracked = set(subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True,
+                                 cwd=Path(__file__).parents[2]).stdout.split('\n'))
+    scripts = [entry for entry in targets if entry['kind'] == 'script']
+    assert len(scripts) == 11
+    for entry in scripts:
+        path = f"{entry['directory']}/{entry['script']}"
+        assert path in tracked, path
+        name = Path(path).name
+        assert not name.startswith('install-docker') and name != 'vm.sh' and 'elastic-beanstalk' not in name
+    by_script = {Path(entry['script']).name: entry for entry in scripts}
+    assert by_script['aws-cli-s3-website.sh']['working_directory'] == '.'
+    assert by_script['aws-cli-dynamodb.sh']['marker'] == 'run_sample has caught an error'
+    assert by_script['aws-cli-rds-postgresql.sh']['placeholders']['<your-public-ip>'] == '203.0.113.10'
+    assert {entry['kind'] for entry in targets} == {'script', 'cloudformation', 'terraform', 'cfn-lint'}
+
+
+def test_aws_targets_schema_rejects_incomplete_entries(tmp_path):
+    path = tmp_path / 'targets.yml'
+    path.write_text(yaml.safe_dump({'aws': [{'exercise': '2', 'kind': 'script', 'directory': 'd'}]}))
+    with pytest.raises(ValueError):
+        common.load_targets(path)
+    path.write_text(yaml.safe_dump({'emulator_gaps': [{'exercise': '2', 'reason': 'r'}]}))
+    with pytest.raises(ValueError):
+        common.load_targets(path)

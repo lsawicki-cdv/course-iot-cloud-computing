@@ -14,6 +14,13 @@ STATUSES = {
 }
 FIELDS = ('cloud', 'exercise', 'layer', 'target', 'file', 'line', 'check', 'status', 'error', 'reason')
 ROW_KEY = ('cloud', 'exercise', 'layer', 'target', 'file', 'line', 'check')
+# Required keys per kind of entry in the `aws` section of targets.yml.
+AWS_REQUIRED = {
+    'script': {'exercise', 'directory', 'script', 'working_directory'},
+    'cloudformation': {'exercise', 'directory', 'working_directory', 'template', 'stack_name', 'capabilities'},
+    'terraform': {'exercise', 'directory', 'working_directory'},
+    'cfn-lint': {'exercise', 'directory', 'template'},
+}
 TARGETS_FILE = Path(__file__).with_name('targets.yml')
 
 _SECRET = r'[\w-]*(?:password|secret|key|token)[\w-]*'
@@ -83,6 +90,13 @@ def load_targets(path=TARGETS_FILE):
         for entry in targets.get(section) or []:
             if not entry.get('reason'):
                 raise ValueError(f'{section} entry without a reason: {entry}')
+    for entry in targets.get('emulator_gaps') or []:
+        if not entry.get('exercise') or not (entry.get('pattern') or entry.get('target')):
+            raise ValueError(f'emulator_gaps entry needs exercise and pattern or target: {entry}')
+    for entry in targets.get('aws') or []:
+        missing = AWS_REQUIRED[entry.get('kind')] - set(entry) if entry.get('kind') in AWS_REQUIRED else {'kind'}
+        if missing:
+            raise ValueError(f'aws entry {entry} lacks {sorted(missing)}')
     return targets
 
 

@@ -201,7 +201,7 @@ def run_target(entry, root, gaps):
 
 def main(argv=None, root=REPO_ROOT):
     targets = common.load_targets()
-    gaps = [gap for gap in targets.get('emulator_gaps') or [] if str(gap.get('exercise')) == '9']
+    gaps = [gap for gap in targets.get('emulator_gaps') or [] if str(gap.get('exercise')) == '9' and gap.get('cloud') != 'aws']
     for entry in targets.get('azure') or []:
         where = dict(cloud='azure', exercise=entry['exercise'], layer='emulator' if entry['kind'] == 'cosmos' else 'iac')
         check = {'bicep': 'build', 'terraform': 'validate'}.get(entry['kind'], 'run')

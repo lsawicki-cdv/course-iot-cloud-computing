@@ -1,4 +1,7 @@
 # Every skip and emulator gap needs a reason.
+# emulator_gaps entries: exercise, reason, and a pattern (message or error code) and/or a target; for the AWS
+# job also `cloud: aws`, `target` (regex on the call `<service> <operation> <args>` or the Terraform address),
+# optional `link`. An entry without a target applies to the exercise 9 boto3 sample's message.
 skip: []
 emulator_gaps: []
 python:
@@ -11,4 +14,21 @@ azure:
   - {exercise: '15', kind: terraform, directory: 15-iot-terraform}
   - {exercise: '18', kind: terraform, directory: 18-timescaledb-terraform}
   - {exercise: '9', kind: cosmos, directory: 9-storage-nosql}
-aws: []
+aws:
+  - {exercise: '2', kind: script, directory: 2-iaas, script: aws/aws-cli-create-vm.sh, working_directory: aws}
+  - {exercise: '3', kind: script, directory: 3-iaas-autoscaling, script: aws/aws-cli-create-auto-scaling-group.sh, working_directory: aws}
+  - {exercise: '4', kind: script, directory: 4-iaas-containers, script: aws/aws-cli-create-vm-docker-engine.sh, working_directory: aws}
+  - {exercise: '4', kind: script, directory: 4-iaas-containers, script: aws/aws-ecs-fargate.sh, working_directory: aws}
+  - {exercise: '6', kind: script, directory: 6-paas-iot-mqtt, script: aws/aws-cli-create-iot-core-thing.sh, working_directory: aws}
+  - {exercise: '6', kind: script, directory: 6-paas-iot-mqtt, script: aws/aws-cli-create-vm-mqtt.sh, working_directory: aws}
+  - {exercise: '7', kind: script, directory: 7-storage-postgresql, script: aws/aws-cli-rds-postgresql.sh, working_directory: aws, placeholders: {'<your-password>': {generate: password}, '<your-public-ip>': '203.0.113.10'}}
+  - {exercise: '8', kind: script, directory: 8-storage-static-website, script: aws/aws-cli-s3-website.sh, working_directory: '.'}
+  - {exercise: '9', kind: script, directory: 9-storage-nosql, script: aws/aws-cli-dynamodb.sh, working_directory: aws, marker: 'run_sample has caught an error'}
+  - {exercise: '10', kind: script, directory: 10-faas-functions, script: aws/aws-cli-lambda-agent.sh, working_directory: aws}
+  - {exercise: '11', kind: script, directory: 11-serverless-iot-platform, script: aws/aws-cli-iot-platform.sh, working_directory: aws}
+  - {exercise: '12', kind: cloudformation, directory: 12-iac-serverless-functions, working_directory: aws, template: template.yaml, stack_name: cloud-computing-faas, capabilities: [CAPABILITY_IAM], parameters: {}}
+  - {exercise: '13', kind: cloudformation, directory: 13-iac-iot-routing, working_directory: aws, template: template.yaml, stack_name: cloud-computing-iot-core, capabilities: [CAPABILITY_IAM], parameters: {ProjectName: contoso}}
+  - {exercise: '14', kind: terraform, directory: 14-iaas-terraform, working_directory: aws}
+  - {exercise: '15', kind: terraform, directory: 15-iot-terraform, working_directory: aws}
+  - {exercise: '12', kind: cfn-lint, directory: 12-iac-serverless-functions, template: aws/template.yaml}
+  - {exercise: '13', kind: cfn-lint, directory: 13-iac-iot-routing, template: aws/template.yaml}
