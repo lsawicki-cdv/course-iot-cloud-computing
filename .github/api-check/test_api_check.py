@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -1204,3 +1205,89 @@ def test_preflight_refuses_wrong_key_endpoint_or_account(aws_env, monkeypatch, n
 def test_child_environment_drops_real_credential_variables():
     env = run_aws_targets.child_env({'PATH': 'p', **dict.fromkeys(FORBIDDEN, 'x')})
     assert env['PATH'] == 'p' and not set(FORBIDDEN) & set(env)
+
+
+WORKFLOW = Path(__file__).parents[1] / 'workflows' / 'cloud-api-check.yml'
+LAYERS = {'azure': ['pytest', 'static', 'python', 'targets'], 'aws': ['pytest', 'static', 'python', 'cfn-lint', 'targets']}
+AWS_VARIABLES = ('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_PROFILE')
+
+
+def workflow():
+    data = yaml.safe_load(WORKFLOW.read_text())
+    data['on'] = data.pop(True, data.get('on'))  # YAML 1.1 reads the key `on` as True
+    return data
+
+
+def job_steps(name):
+    return workflow()['jobs'][name]['steps']
+
+
+def step_by_id(name, step_id):
+    return next(step for step in job_steps(name) if step.get('id') == step_id)
+
+
+def test_workflow_permissions_and_triggers():
+    data = workflow()
+    assert 'pull_request_target' not in data['on']
+    assert set(data['on']) == {'workflow_dispatch'}
+    assert data['permissions'] == {'contents': 'read'}
+    assert all(job.get('permissions', {'contents': 'read'}) == {'contents': 'read'} for job in data['jobs'].values())
+
+
+def test_workflow_jobs_timeouts_and_runner():
+    jobs = workflow()['jobs']
+    assert set(jobs) == {'azure', 'aws'}
+    assert (jobs['azure']['timeout-minutes'], jobs['aws']['timeout-minutes']) == (60, 180)
+    assert all(job['runs-on'] == 'ubuntu-latest' for job in jobs.values())
+
+
+def test_workflow_actions_pinned_to_a_commit():
+    uses = [step['uses'] for job in workflow()['jobs'].values() for step in job['steps'] if 'uses' in step]
+    assert {name.split('@')[0] for name in uses} == {'actions/checkout', 'actions/setup-python'}
+    assert all(re.fullmatch(r'[\w./-]+@[0-9a-f]{40}', name) for name in uses)
+
+
+@pytest.mark.parametrize('job', ['azure', 'aws'])
+def test_workflow_steps_have_ids_and_layer_order(job):
+    steps = job_steps(job)
+    ids = [step.get('id') for step in steps]
+    assert all(ids) and len(set(ids)) == len(ids)
+    layers = LAYERS[job]
+    assert [i for i in ids if i in layers] == layers
+    for layer in layers:
+        assert step_by_id(job, layer)['if'] == 'always()'
+    assert ids[-1] == 'summary' and steps[-1]['if'] == 'always()'
+    assert all(i.startswith('install-') for i in ids if i.startswith('install'))
+
+
+@pytest.mark.parametrize('job', ['azure', 'aws'])
+def test_workflow_commands_run_the_checker_scripts(job):
+    runs = {layer: step_by_id(job, layer)['run'] for layer in LAYERS[job]}
+    assert 'pytest .github/api-check' in runs['pytest']
+    assert f'check_cli.py --cloud {job}' in runs['static']
+    assert f'check_python.py --cloud {job}' in runs['python']
+    assert f'run_{job}_targets.py' in runs['targets'] and '--cfn-lint' not in runs['targets']
+    if job == 'aws':
+        assert 'run_aws_targets.py --cfn-lint' in runs['cfn-lint']
+    summary_step = step_by_id(job, 'summary')
+    assert f'summary.py --cloud {job}' in summary_step['run']
+    assert summary_step['env'] == {'STEPS_JSON': '${{ toJSON(steps) }}'}
+    assert 'API_CHECK_PYTHON' in ''.join(step.get('run', '') for step in job_steps(job))
+
+
+def test_workflow_sets_no_real_aws_credentials():
+    data = workflow()
+    scopes = [data.get('env') or {}]
+    for job in data['jobs'].values():
+        scopes.append(job.get('env') or {})
+        scopes += [step.get('env') or {} for step in job['steps']]
+    assert not {name for scope in scopes for name in scope} & set(AWS_VARIABLES)
+    assert '::add-mask::' in step_by_id('aws', 'emulator')['run']
+
+
+def test_workflow_emulator_command():
+    run = step_by_id('aws', 'emulator')['run']
+    command = next(line for line in run.splitlines() if 'nohup' in line)
+    assert '-p 9297' in command and '-t off' in command
+    assert not re.search(r'\s-b\b|\s-a off', command)
+    assert re.search(r'unset .*AWS_SESSION_TOKEN', run)

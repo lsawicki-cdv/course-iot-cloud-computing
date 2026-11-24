@@ -1,0 +1,158 @@
+name: Cloud API check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  azure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup-python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - id: install-az
+        name: Install the Azure CLI and Bicep
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          az bicep install
+      - id: install-terraform
+        name: Install Terraform
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y terraform
+      - id: install-checker
+        name: Install the checker
+        run: |
+          python -m venv "$RUNNER_TEMP/checker-venv"
+          "$RUNNER_TEMP/checker-venv/bin/pip" install -r .github/api-check/requirements.txt
+          echo "$RUNNER_TEMP/checker-venv/bin" >> "$GITHUB_PATH"
+          echo "API_CHECK_PYTHON=$RUNNER_TEMP/checker-venv/bin/python" >> "$GITHUB_ENV"
+      - id: pytest
+        if: always()
+        run: pytest .github/api-check
+      - id: static
+        if: always()
+        run: python .github/api-check/check_cli.py --cloud azure
+      - id: python
+        if: always()
+        run: python .github/api-check/check_python.py --cloud azure
+      - id: targets
+        if: always()
+        run: python .github/api-check/run_azure_targets.py
+      - id: summary
+        if: always()
+        run: python .github/api-check/summary.py --cloud azure
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+
+  aws:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup-python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - id: install-aws-cli
+        name: Install the AWS CLI v2
+        run: |
+          dir="$(mktemp -d)"
+          curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o "$dir/awscliv2.zip"
+          unzip -q "$dir/awscliv2.zip" -d "$dir"
+          sudo "$dir/aws/install" --update
+      - id: install-terraform
+        name: Install Terraform
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y terraform
+      - id: install-aws-emulator
+        name: Install the AWS Emulator
+        run: |
+          dir="$(mktemp -d)"
+          curl -fsSL https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/latest/aws-emulator_amd64.deb -o "$dir/aws-emulator.deb"
+          sudo apt-get install -y "$dir/aws-emulator.deb"
+      - id: install-checker
+        name: Install the checker
+        run: |
+          python -m venv "$RUNNER_TEMP/checker-venv"
+          "$RUNNER_TEMP/checker-venv/bin/pip" install -r .github/api-check/requirements.txt
+          echo "$RUNNER_TEMP/checker-venv/bin" >> "$GITHUB_PATH"
+          echo "API_CHECK_PYTHON=$RUNNER_TEMP/checker-venv/bin/python" >> "$GITHUB_ENV"
+      - id: emulator
+        name: Start the AWS Emulator
+        run: |
+          unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE AWS_WEB_IDENTITY_TOKEN_FILE AWS_ROLE_ARN
+          dir="$HOME/.aws/emulator/9297"
+          nohup /opt/aws-emulator/bin/aws-emulator -p 9297 -t off > "$RUNNER_TEMP/aws-emulator.log" 2>&1 &
+          for _ in $(seq 30); do
+            if curl -fsS --cacert "$dir/ca.pem" https://127.0.0.1:9297/__admin/health > /dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS --cacert "$dir/ca.pem" https://127.0.0.1:9297/__admin/health > /dev/null
+          key="$("$API_CHECK_PYTHON" -I - "$dir/emulator_credentials" aws_access_key_id <<'PY'
+          import configparser, sys
+          parser = configparser.ConfigParser()
+          parser.read(sys.argv[1])
+          print(next(s[sys.argv[2]] for s in parser.values() if sys.argv[2] in s))
+          PY
+          )"
+          secret="$("$API_CHECK_PYTHON" -I - "$dir/emulator_credentials" aws_secret_access_key <<'PY'
+          import configparser, sys
+          parser = configparser.ConfigParser()
+          parser.read(sys.argv[1])
+          print(next(s[sys.argv[2]] for s in parser.values() if sys.argv[2] in s))
+          PY
+          )"
+          echo "::add-mask::$secret"
+          {
+            echo "AWS_CONFIG_FILE=$dir/config"
+            echo "AWS_SHARED_CREDENTIALS_FILE=$dir/emulator_credentials"
+            echo "AWS_CA_BUNDLE=$dir/ca.pem"
+            echo "AWS_ENDPOINT_URL=https://127.0.0.1:9297"
+            echo "AWS_REGION=eu-west-2"
+            echo "AWS_DEFAULT_REGION=eu-west-2"
+            echo "AWS_ACCESS_KEY_ID=$key"
+            echo "AWS_SECRET_ACCESS_KEY=$secret"
+          } >> "$GITHUB_ENV"
+      - id: identity
+        name: Check the account is the emulator's
+        run: test "$(aws sts get-caller-identity --query Account --output text)" = 000000000000
+      - id: pytest
+        if: always()
+        run: pytest .github/api-check
+      - id: static
+        if: always()
+        run: python .github/api-check/check_cli.py --cloud aws
+      - id: python
+        if: always()
+        run: python .github/api-check/check_python.py --cloud aws
+      - id: cfn-lint
+        if: always()
+        run: python .github/api-check/run_aws_targets.py --cfn-lint
+      - id: targets
+        if: always()
+        run: python .github/api-check/run_aws_targets.py
+      - id: summary
+        if: always()
+        run: python .github/api-check/summary.py --cloud aws
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
