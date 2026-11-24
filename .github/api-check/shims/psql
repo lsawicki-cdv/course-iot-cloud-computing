@@ -1,0 +1,4 @@
+#!/bin/bash
+# The database host comes from an emulator response, so never connect.
+echo "psql: blocked by the API check" >&2
+exit 2

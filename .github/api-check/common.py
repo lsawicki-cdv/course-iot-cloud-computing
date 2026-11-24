@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import tempfile
 from pathlib import Path
@@ -85,6 +86,21 @@ def load_targets(path=TARGETS_FILE):
     return targets
 
 
+def raw_log_path():
+    return base_dir() / 'aws-calls.jsonl'
+
+
+def write_raw_call(script, line, argv, exit_code, stderr, timed_out):
+    """Append one masked aws call to the raw log."""
+    masked = shlex.split(mask(shlex.join(argv)))
+    entry = {'script': script, 'line': line, 'argv': masked, 'exit': exit_code,
+             'stderr': mask(stderr), 'timed_out': timed_out}
+    path = raw_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a', encoding='utf-8') as raw_log:
+        raw_log.write(json.dumps(entry) + '\n')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest='command', required=True)
@@ -93,8 +109,18 @@ def main(argv=None):
     infra.add_argument('--cloud', required=True)
     infra.add_argument('--check', required=True)
     infra.add_argument('--error', required=True)
+    raw = commands.add_parser('rawlog')
+    raw.add_argument('--script', default='')
+    raw.add_argument('--line', default='')
+    raw.add_argument('--exit', type=int, required=True)
+    raw.add_argument('--timed-out', type=int, default=0)
+    raw.add_argument('--stderr-file', required=True)
+    raw.add_argument('call', nargs='*')
     args = parser.parse_args(argv)
-    if args.command == 'reset':
+    if args.command == 'rawlog':
+        stderr = Path(args.stderr_file).read_text(encoding='utf-8', errors='replace')
+        write_raw_call(args.script, args.line, args.call, args.exit, stderr, bool(args.timed_out))
+    elif args.command == 'reset':
         shutil.rmtree(base_dir(), ignore_errors=True)
     else:
         write_row(cloud=args.cloud, layer='static', check=args.check, status='infrastructure', error=args.error)

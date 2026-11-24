@@ -563,3 +563,150 @@ def test_cosmos_sample_failures_remove_container(tmp_path, monkeypatch, cosmos_v
     assert row['status'] == status
     removal = fake.ran('docker rm -f')
     assert removal and removal[0][-1] == fake.ran('docker run')[0][fake.ran('docker run')[0].index('--name') + 1]
+
+
+SHIMS = Path(__file__).parent / 'shims'
+
+
+def fake_script(path, body):
+    path.write_text('#!/bin/bash\n' + body)
+    path.chmod(0o755)
+    return path
+
+
+@pytest.fixture
+def shim_env(tmp_path, monkeypatch):
+    """Environment for the shims: real aws and curl are fixtures; calls are recorded."""
+    calls = tmp_path / 'calls'
+    fake_script(tmp_path / 'real-aws', f'echo "$@" >> {calls}\necho out-$1\necho err-$1 >&2\nexit "${{FAKE_EXIT:-0}}"\n')
+    fake_script(tmp_path / 'real-curl', f'echo "$@" >> {calls}\necho curl-ok\n')
+    env = dict(os.environ, API_CHECK_REAL_AWS=str(tmp_path / 'real-aws'),
+               API_CHECK_REAL_CURL=str(tmp_path / 'real-curl'), API_CHECK_PYTHON=sys.executable,
+               API_CHECK_SCRIPT='2/aws/x.sh', API_CHECK_LINE='42', RUNNER_TEMP=str(tmp_path))
+    env.pop('API_CHECK_AWS_TIMEOUT', None)
+    env['calls'] = str(calls)
+    return env
+
+
+def run_shim(name, env, *args, cwd=None):
+    return subprocess.run([str(SHIMS / name), *args], env=env, cwd=cwd, capture_output=True, text=True, timeout=60)
+
+
+def raw_calls(env):
+    path = Path(env['RUNNER_TEMP']) / 'api-check' / 'aws-calls.jsonl'
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+def real_calls(env):
+    path = Path(env['calls'])
+    return path.read_text().splitlines() if path.exists() else []
+
+
+def test_shims_are_executable():
+    for name in ('aws', 'curl', 'psql'):
+        assert os.access(SHIMS / name, os.X_OK)
+
+
+def test_aws_shim_passes_output_and_logs_one_line(shim_env):
+    shim_env['FAKE_EXIT'] = '3'
+    result = run_shim('aws', shim_env, 's3', 'ls', '--password', 'hunter2')
+    assert result.stdout == 'out-s3\n'
+    assert result.returncode == 3
+    assert 'err-s3' in result.stderr
+    (entry,) = raw_calls(shim_env)
+    assert entry['script'] == '2/aws/x.sh'
+    assert entry['line'] == '42'
+    assert entry['argv'] == ['s3', 'ls', '--password', '***']
+    assert entry['exit'] == 3
+    assert 'err-s3' in entry['stderr']
+    assert entry['timed_out'] is False
+    assert 'hunter2' not in json.dumps(entry)
+
+
+def fake_timeout(tmp_path, env):
+    """Put a `timeout` on PATH that records its arguments, then runs the command."""
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    fake_script(bin_dir / 'timeout', f'echo "$@" > {tmp_path}/timeout-args\nwhile [[ $1 == --* ]]; do shift; done\nshift\nexec "$@"\n')
+    env['PATH'] = f"{bin_dir}:{env['PATH']}"
+    return tmp_path / 'timeout-args'
+
+
+def test_aws_shim_default_and_deploy_timeouts(tmp_path, shim_env):
+    args = fake_timeout(tmp_path, shim_env)
+    run_shim('aws', shim_env, 's3', 'ls')
+    assert args.read_text().startswith('--kill-after=5 120 ')
+    run_shim('aws', shim_env, 'cloudformation', 'deploy', '--stack-name', 's')
+    assert args.read_text().startswith('--kill-after=5 600 ')
+    shim_env['API_CHECK_AWS_TIMEOUT'] = '7'
+    run_shim('aws', shim_env, 'cloudformation', 'deploy')
+    assert args.read_text().startswith('--kill-after=5 7 ')
+
+
+def test_aws_shim_timeout_kills_and_logs(tmp_path, shim_env):
+    fake_script(tmp_path / 'real-aws', 'exec sleep 30\n')
+    shim_env['API_CHECK_AWS_TIMEOUT'] = '1'
+    result = run_shim('aws', shim_env, 'ecs', 'wait', 'tasks-running')
+    assert result.returncode != 0
+    (entry,) = raw_calls(shim_env)
+    assert entry['timed_out'] is True
+
+
+def test_aws_shim_works_without_yaml_from_another_directory(tmp_path, shim_env):
+    bin_dir = tmp_path / 'venv-bin'
+    bin_dir.mkdir()
+    fake_script(bin_dir / 'python3', 'echo "No module named yaml" >&2\nexit 1\n')
+    shim_env['PATH'] = f"{bin_dir}:{shim_env['PATH']}"
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    result = run_shim('aws', shim_env, 'sts', 'get-caller-identity', cwd=elsewhere)
+    assert result.stdout == 'out-sts\n'
+    assert len(raw_calls(shim_env)) == 1
+
+
+@pytest.mark.parametrize('url', [
+    'https://raw.githubusercontent.com/lsawicki-cdv/course-iot-cloud-computing/x',
+    'https://checkip.amazonaws.com',
+    'https://checkip.amazonaws.com/',
+    'http://127.0.0.1:1/',
+    'http://localhost:8080/a',
+    'http://[::1]:9/',
+])
+def test_curl_shim_passes_allowed_urls(shim_env, url):
+    result = run_shim('curl', shim_env, '-s', url)
+    assert result.returncode == 0
+    assert result.stdout == 'curl-ok\n'
+    assert real_calls(shim_env) == [f'-s {url}']
+
+
+@pytest.mark.parametrize('url', [
+    'http://203.0.113.5',
+    'https://abc.execute-api.eu-west-2.amazonaws.com/x?code=k',
+    'https://raw.githubusercontent.com.evil.example/lsawicki-cdv/course-iot-cloud-computing/x',
+    'https://checkip.amazonaws.com@203.0.113.5/',
+    'https://raw.githubusercontent.com/other/repo/x',
+    'http://127.0.0.1@203.0.113.5/',
+    'http://localhost.evil.example/',
+])
+def test_curl_shim_refuses_other_urls(shim_env, url):
+    result = run_shim('curl', shim_env, '-s', url)
+    assert result.returncode == 7
+    assert real_calls(shim_env) == []
+
+
+def test_curl_shim_refuses_one_bad_url_among_good(shim_env):
+    result = run_shim('curl', shim_env, 'https://checkip.amazonaws.com', 'http://203.0.113.5')
+    assert result.returncode == 7
+    assert real_calls(shim_env) == []
+
+
+def test_curl_shim_refuses_without_url_and_with_proxy(shim_env):
+    assert run_shim('curl', shim_env, '-s').returncode == 7
+    assert run_shim('curl', shim_env, '-x', 'http://203.0.113.5', 'https://checkip.amazonaws.com').returncode == 7
+    assert real_calls(shim_env) == []
+
+
+def test_psql_shim_exits_two_and_calls_nothing(shim_env):
+    result = run_shim('psql', shim_env, '-h', 'db')
+    assert result.returncode == 2
+    assert real_calls(shim_env) == []

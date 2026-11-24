@@ -1,0 +1,48 @@
+#!/bin/bash
+# Passes only requests to the repository's raw files, checkip.amazonaws.com and loopback; exit 7 otherwise.
+refuse() {
+    echo "curl: blocked by the API check: $1" >&2
+    exit 7
+}
+
+allowed() {
+    local url=$1 authority host
+    [[ $url =~ ^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*) ]] || return 1
+    local scheme=${BASH_REMATCH[1],,} path=${BASH_REMATCH[3]}
+    authority=${BASH_REMATCH[2]}
+    [[ $url == *\\* || $url == *[[:space:]]* ]] && return 1
+    [[ $authority == *@* ]] && return 1
+    host=${authority,,}
+    if [[ $host =~ ^(\[[0-9a-f:]*\]|[^:]*)(:[0-9]*)?$ ]]; then host=${BASH_REMATCH[1]}; else return 1; fi
+    case $host in
+        127.0.0.1 | localhost | '[::1]') return 0 ;;
+    esac
+    [[ $scheme == https && $authority == "$host" ]] || return 1
+    case $host in
+        checkip.amazonaws.com) return 0 ;;
+        raw.githubusercontent.com) [[ $path == /lsawicki-cdv/course-iot-cloud-computing/* ]] ;;
+        *) return 1 ;;
+    esac
+}
+
+urls=0
+value_next=0
+for arg in "$@"; do
+    if [ "$value_next" -eq 1 ]; then value_next=0; [[ $arg == *://* ]] || continue; fi
+    case $arg in
+        -x | --proxy* | --preproxy* | --connect-to* | --resolve* | --socks* | -[a-zA-Z]x*) refuse "$arg" ;;
+        -o | -H | -d | -X | -u | -A | -e | -m | -w | -b | -c | -T | -F | -K | -r | -E | \
+        --output | --header | --data | --data-raw | --data-binary | --request | --user | --user-agent | --referer | \
+        --max-time | --write-out | --cookie | --cookie-jar | --upload-file | --form | --config | --retry | \
+        --connect-timeout | --cacert | --cert | --key)
+            value_next=1; continue ;;
+        -*) [[ $arg == *://* ]] || continue ;;
+    esac
+    # URL arguments, including --url and a bare host; option values are not URLs.
+    candidate=${arg#--url=}
+    [[ $candidate == *://* ]] || candidate="http://$candidate"
+    allowed "$candidate" || refuse "$arg"
+    urls=$((urls + 1))
+done
+[ "$urls" -gt 0 ] || refuse "no allowed URL"
+exec "$API_CHECK_REAL_CURL" "$@"

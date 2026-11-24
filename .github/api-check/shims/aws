@@ -1,0 +1,20 @@
+#!/bin/bash
+# Calls the real aws with a timeout and records the call in the raw log; stdout is the real stdout only.
+timeout_s=120
+case " $* " in *" cloudformation deploy "*) timeout_s=600 ;; esac
+timeout_s=${API_CHECK_AWS_TIMEOUT:-$timeout_s}
+
+stderr_file=$(mktemp)
+trap 'rm -f "$stderr_file"' EXIT
+
+timeout --kill-after=5 "$timeout_s" "$API_CHECK_REAL_AWS" "$@" 2>"$stderr_file"
+status=$?
+cat "$stderr_file" >&2
+
+timed_out=0
+if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then timed_out=1; fi
+
+"$API_CHECK_PYTHON" "$(dirname "$0")/../common.py" rawlog \
+    --script "${API_CHECK_SCRIPT:-}" --line "${API_CHECK_LINE:-}" --exit "$status" \
+    --timed-out "$timed_out" --stderr-file "$stderr_file" -- "$@" >/dev/null 2>&1 || true
+exit "$status"
