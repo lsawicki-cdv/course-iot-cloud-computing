@@ -11,6 +11,7 @@ import yaml
 import check_cli
 import check_python
 import classify
+import run_aws_targets
 import run_azure_targets
 import common
 import summary
@@ -925,3 +926,214 @@ def test_aws_targets_schema_rejects_incomplete_entries(tmp_path):
     path.write_text(yaml.safe_dump({'emulator_gaps': [{'exercise': '2', 'reason': 'r'}]}))
     with pytest.raises(ValueError):
         common.load_targets(path)
+
+
+# ---- AWS targets runner ----
+
+EMULATOR_ENV = {'AWS_ACCESS_KEY_ID': 'EMULATORABC', 'AWS_SECRET_ACCESS_KEY': 'x',
+                'AWS_ENDPOINT_URL': 'https://127.0.0.1:9297'}
+FORBIDDEN = ('AWS_SESSION_TOKEN', 'AWS_PROFILE', 'AWS_WEB_IDENTITY_TOKEN_FILE', 'AWS_ROLE_ARN',
+             'AWS_CONTAINER_CREDENTIALS_FULL_URI', 'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI',
+             'AWS_CONTAINER_AUTHORIZATION_TOKEN')
+
+FAKE_AWS = '''echo "$*" >> "$OUT/aws-calls"
+case "$1" in
+  sts) echo "${FAKE_ACCOUNT:-000000000000}" ;;
+  s3) echo "NotImplemented: s3" >&2; exit 254 ;;
+  cloudformation)
+    if [ "$2" = deploy ]; then echo "Failed to create the stack" >&2; exit 255; fi
+    echo "Handler NotImplemented in the emulator" ;;
+esac
+'''
+FAKE_TERRAFORM = '''echo "$PWD $1 $AWS_ENDPOINT_URL" >> "$OUT/terraform-calls"
+case "$1" in
+  graph) echo "digraph {}" ;;
+  apply) [ -n "$APPLY_SLEEP" ] && sleep "$APPLY_SLEEP"; echo '{"type":"diagnostic","diagnostic":{"severity":"error","summary":"Bad","detail":"d","address":"aws_x.y"}}'; exit 1 ;;
+esac
+'''
+FAKE_CFN_LINT = '''case "$PWD" in *12-faas*) echo "aws/template.yaml:3:1:E2531:deprecated runtime"; exit 2 ;; esac'''
+
+
+@pytest.fixture
+def aws_env(tmp_path, monkeypatch):
+    """A git repo with the exercises, fake aws/terraform/cfn-lint on PATH and an emulator-like environment."""
+    out = tmp_path / 'out'
+    out.mkdir()
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for name, body in (('aws', FAKE_AWS), ('terraform', FAKE_TERRAFORM), ('cfn-lint', FAKE_CFN_LINT)):
+        fake_script(bin_dir / name, body)
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    monkeypatch.setenv('PATH', f"{bin_dir}:{os.environ['PATH']}")
+    monkeypatch.setenv('OUT', str(out))
+    monkeypatch.setenv('RUNNER_TEMP', str(tmp_path / 'tmp'))
+    monkeypatch.delenv('API_CHECK_REAL_AWS', raising=False)
+    for name in FORBIDDEN:
+        monkeypatch.delenv(name, raising=False)
+    for name, value in EMULATOR_ENV.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv('FAKE_ACCOUNT', '000000000000')
+    return repo, out
+
+
+def commit_repo(repo, files):
+    for name, text in files.items():
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    git = ['git', '-c', 'user.email=a@b', '-c', 'user.name=n']
+    subprocess.run(['git', 'init', '-q'], cwd=repo, check=True)
+    subprocess.run(['git', 'add', '.'], cwd=repo, check=True)
+    subprocess.run([*git, 'commit', '-q', '-m', 'x'], cwd=repo, check=True)
+
+
+def run_aws(monkeypatch, repo, targets, *argv, gaps=()):
+    monkeypatch.setattr(common, 'load_targets', lambda: {'aws': targets, 'emulator_gaps': list(gaps)})
+    return run_aws_targets.main(list(argv), root=repo)
+
+
+def result_statuses():
+    path = common.results_path()
+    return [(row['target'], row['status']) for row in map(json.loads, path.read_text().splitlines())]
+
+
+SCRIPT_ENTRY = {'exercise': '2', 'kind': 'script', 'directory': '2-iaas', 'script': 'aws/a.sh',
+                'working_directory': 'aws'}
+DUMP_SCRIPT = '''#!/bin/bash
+pwd > "$OUT/pwd"
+readlink /proc/self/fd/0 > "$OUT/stdin"
+echo "$REGION $API_CHECK_REAL_AWS ${PATH%%:*}" > "$OUT/env"
+X=$(aws s3 ls)
+'''
+
+
+def test_script_runs_in_archive_copy_with_shims_and_line_numbers(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': DUMP_SCRIPT, '2-iaas/aws/b.sh': 'touch "$OUT/b-ran"\n'})
+    (repo / '2-iaas' / 'aws' / 'untracked.txt').write_text('x')
+    assert run_aws(monkeypatch, repo, [SCRIPT_ENTRY]) == 0
+    work = (out / 'pwd').read_text().strip()
+    assert work.endswith('2-iaas/aws') and not work.startswith(str(repo))
+    assert (out / 'stdin').read_text().strip() == '/dev/null'
+    region, real_aws, first = (out / 'env').read_text().split()
+    assert region == 'eu-west-2' and real_aws.endswith('/bin/aws') and first.endswith('api-check/shims')
+    assert not (out / 'b-ran').exists()
+    assert result_statuses()[0] == ('2-iaas/aws/a.sh', 'pending')
+    rows = common.read_rows()
+    call = next(row for row in rows if row['check'] == 's3 ls')
+    assert call['line'] == '5' and call['status'] == 'not-covered'
+    assert [row['status'] for row in rows if row['check'] == 'run'] == ['not-covered']
+    assert common.log_path('x').parent.glob('*a.sh*')
+
+
+def test_script_target_not_in_targets_never_runs(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'touch "$OUT/ran"\n'})
+    run_aws(monkeypatch, repo, [])
+    assert not (out / 'ran').exists()
+
+
+def test_placeholders_replaced_in_copy_only(aws_env, monkeypatch):
+    repo, out = aws_env
+    script = 'echo "$PW $IP" > "$OUT/values"\nPW="<your-password>"\nIP="<your-public-ip>"\necho "$PW $IP" > "$OUT/values"\n'
+    commit_repo(repo, {'7-storage/aws/a.sh': script})
+    entry = {'exercise': '7', 'kind': 'script', 'directory': '7-storage', 'script': 'aws/a.sh',
+             'working_directory': 'aws',
+             'placeholders': {'<your-password>': {'generate': 'password'}, '<your-public-ip>': '203.0.113.10'}}
+    run_aws(monkeypatch, repo, [entry])
+    password, ip = (out / 'values').read_text().split()
+    assert len(password) >= 16 and '<' not in password and ip == '203.0.113.10'
+    status = subprocess.run(['git', 'status', '--porcelain'], cwd=repo, capture_output=True, text=True).stdout
+    assert status == ''
+
+
+def test_exercise_9_uses_its_venv_python_and_missing_venv_is_infrastructure(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'9-storage-nosql/aws/a.sh': 'command -v python3 > "$OUT/python"\n'})
+    entry = {'exercise': '9', 'kind': 'script', 'directory': '9-storage-nosql', 'script': 'aws/a.sh',
+             'working_directory': 'aws', 'marker': 'run_sample has caught an error'}
+    run_aws(monkeypatch, repo, [entry])
+    assert not (out / 'python').exists()
+    assert result_statuses()[-1] == ('9-storage-nosql/aws/a.sh', 'infrastructure')
+    venv_bin = common.base_dir() / 'venvs' / '9-storage-nosql_aws' / 'bin'
+    venv_bin.mkdir(parents=True)
+    fake_script(venv_bin / 'python3', 'echo "run_sample has caught an error: boom"\n')
+    run_aws(monkeypatch, repo, [entry])
+    assert (out / 'python').read_text().strip() == str(venv_bin / 'python3')
+
+
+def test_cfn_lint_one_row_per_template(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'12-faas/aws/template.yaml': 'x', '13-iot/aws/template.yaml': 'x'})
+    targets = [{'exercise': '12', 'kind': 'cfn-lint', 'directory': '12-faas', 'template': 'aws/template.yaml'},
+               {'exercise': '13', 'kind': 'cfn-lint', 'directory': '13-iot', 'template': 'aws/template.yaml'}]
+    run_aws(monkeypatch, repo, targets, '--cfn-lint')
+    rows = {row['exercise']: row for row in common.read_rows()}
+    assert rows['12']['status'] == 'drift' and 'E2531' in rows['12']['error']
+    assert rows['13']['status'] == 'ok'
+    assert not (Path(os.environ['OUT']) / 'aws-calls').exists()
+
+
+def test_cloudformation_deploy_reads_stack_events_on_failure(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'12-faas/aws/template.yaml': 'x'})
+    entry = {'exercise': '12', 'kind': 'cloudformation', 'directory': '12-faas', 'working_directory': 'aws',
+             'template': 'template.yaml', 'stack_name': 'cloud-x', 'capabilities': ['CAPABILITY_IAM'],
+             'parameters': {'ProjectName': 'contoso'}}
+    run_aws(monkeypatch, repo, [entry])
+    calls = (out / 'aws-calls').read_text()
+    assert 'cloudformation deploy' in calls and '--stack-name cloud-x' in calls
+    assert 'ProjectName=contoso' in calls and 'describe-stack-events' in calls
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert {row['status'] for row in rows} == {'not-covered'}
+
+
+def test_terraform_runs_in_copy_with_emulator_endpoint(aws_env, monkeypatch):
+    repo, out = aws_env
+    commit_repo(repo, {'14-vm/aws/main.tf': 'x'})
+    entry = {'exercise': '14', 'kind': 'terraform', 'directory': '14-vm', 'working_directory': 'aws'}
+    run_aws(monkeypatch, repo, [entry])
+    lines = [line.split() for line in (out / 'terraform-calls').read_text().splitlines()]
+    assert [line[1] for line in lines] == ['init', 'graph', 'apply']
+    assert all(line[0].endswith('14-vm/aws') and not line[0].startswith(str(repo)) for line in lines)
+    assert lines[0][2] == 'https://127.0.0.1:9297'
+    assert ('aws_x.y', 'drift') in [(row['target'], row['status']) for row in common.read_rows()]
+
+
+def test_terraform_apply_timeout_is_killed_and_classified(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'14-vm/aws/main.tf': 'x'})
+    entry = {'exercise': '14', 'kind': 'terraform', 'directory': '14-vm', 'working_directory': 'aws'}
+    monkeypatch.setenv('APPLY_SLEEP', '30')
+    monkeypatch.setattr(run_aws_targets, 'TERRAFORM_TIMEOUT', 1)
+    run_aws(monkeypatch, repo, [entry])
+    rows = common.read_rows()
+    assert [(row['status'], row['error']) for row in rows] == [('drift', 'timeout')]
+
+
+@pytest.mark.parametrize('name', FORBIDDEN)
+def test_preflight_refuses_real_credential_variables(aws_env, monkeypatch, name):
+    repo, out = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'touch "$OUT/ran"\n'})
+    monkeypatch.setenv(name, 'x')
+    run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
+    assert not (out / 'ran').exists()
+    assert [row['status'] for row in common.read_rows()] == ['infrastructure']
+
+
+@pytest.mark.parametrize('name, value', [
+    ('AWS_ACCESS_KEY_ID', 'AKIAREAL'), ('AWS_ENDPOINT_URL', 'https://example.com:9297'),
+    ('AWS_ENDPOINT_URL', 'http://127.0.0.1:9297'), ('FAKE_ACCOUNT', '123456789012')])
+def test_preflight_refuses_wrong_key_endpoint_or_account(aws_env, monkeypatch, name, value):
+    repo, out = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'touch "$OUT/ran"\n'})
+    monkeypatch.setenv(name, value)
+    run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
+    assert not (out / 'ran').exists()
+    assert [row['status'] for row in common.read_rows()] == ['infrastructure']
+
+
+def test_child_environment_drops_real_credential_variables():
+    env = run_aws_targets.child_env({'PATH': 'p', **dict.fromkeys(FORBIDDEN, 'x')})
+    assert env['PATH'] == 'p' and not set(FORBIDDEN) & set(env)
