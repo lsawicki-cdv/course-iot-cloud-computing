@@ -7,6 +7,7 @@ import yaml
 
 import check_cli
 import common
+import summary
 
 
 @pytest.fixture(autouse=True)
@@ -176,3 +177,77 @@ def test_flag_prefixes(tmp_path, fake_cli):
     assert rows['az prefixed op --destination-port-rangezz', 'flag']['status'] == 'missing-flag'
     assert rows['az prefixed op --start', 'flag']['status'] == 'missing-flag'
     assert ('az prefixed op --start-ip', 'flag') not in rows
+
+
+def summarize(capsys, *argv, cloud='aws'):
+    code = summary.main(['--cloud', cloud, *argv])
+    return code, capsys.readouterr().out
+
+
+def row(status, **fields):
+    values = dict(cloud='aws', exercise='7', layer='static', target='aws s3 ls', check='command', error=None)
+    common.write_row(status=status, **{**values, **fields})
+
+
+def test_summary_failing_row_exits_one(capsys):
+    row('ok')
+    row('missing-flag', target='aws s3 ls --regoin', check='flag', file='7/readme.md', line=12, error='not listed')
+    code, out = summarize(capsys)
+    failing, _, other = out.partition('Not failing')
+    assert code == 1 and '7/readme.md:12' in failing and 'missing-flag' in failing and 'not listed' in failing
+    assert 'aws s3 ls --regoin' not in other and '1 ok' in out
+
+
+def test_summary_non_failing_rows_exit_zero(capsys):
+    for status in ('not-covered', 'consequential', 'skipped', 'newly-covered'):
+        row(status, target=f'target-{status}', check='run', reason='why')
+    code, out = summarize(capsys)
+    failing, _, other = out.partition('Not failing')
+    assert code == 0 and 'target-' not in failing
+    assert all(f'target-{status}' in other for status in ('not-covered', 'consequential', 'skipped', 'newly-covered'))
+
+
+def test_summary_pending_is_not_reached(capsys):
+    row('pending', layer='emulator', target='7/run.sh', check='run')
+    code, out = summarize(capsys)
+    assert code == 1 and 'not reached' in out and '7/run.sh' in out and 'infrastructure' in out
+
+
+def test_summary_failed_step_is_infrastructure(capsys):
+    steps = json.dumps({'install-az': {'outcome': 'failure'}, 'pytest': {'outcome': 'success'}})
+    code, out = summarize(capsys, '--steps-json', steps)
+    assert code == 1 and 'install-az' in out and 'pytest' not in out
+
+
+def test_summary_steps_from_environment(capsys, monkeypatch):
+    monkeypatch.setenv('STEPS_JSON', '{"emulator": {"outcome": "failure"}}')
+    code, out = summarize(capsys)
+    assert code == 1 and 'emulator' in out
+
+
+def test_summary_filters_cloud(capsys):
+    row('drift', cloud='azure', target='az vm create')
+    code, out = summarize(capsys)
+    assert code == 0 and 'az vm create' not in out
+
+
+def test_summary_masks_error_again(capsys, tmp_path):
+    line = dict(cloud='aws', exercise='7', layer='static', target='t', check='run', status='drift',
+                error='boom --token abc123')
+    common.results_path().parent.mkdir(parents=True)
+    common.results_path().write_text(json.dumps(line) + '\n')
+    code, out = summarize(capsys)
+    assert code == 1 and 'abc123' not in out and '--token ***' in out
+
+
+def test_summary_appends_to_step_summary(capsys, tmp_path, monkeypatch):
+    target = tmp_path / 'step.md'
+    monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(target))
+    row('missing-command', target='aws bogus thing')
+    code, out = summarize(capsys)
+    assert code == 1 and out == '' and 'aws bogus thing' in target.read_text()
+
+
+def test_summary_footer_lists_gaps(capsys):
+    _, out = summarize(capsys)
+    assert 'short flags' in out and 'positional arguments' in out and 'data plane' in out
