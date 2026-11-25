@@ -22,6 +22,9 @@ In exercise 9 you will use Cosmos DB, a NoSQL database that stores JSON document
 Ubuntu 26.04
 Python 3.10+
 Azure Cloud Shell (Bash and PowerShell)
+Azure CLI 2.93.0
+
+If you run the steps from a local Azure CLI and a step fails with `unrecognized arguments`, run `az upgrade` (Cloud Shell is always up to date).
 
 ### Steps
 
