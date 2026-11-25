@@ -580,7 +580,7 @@ STORAGE_NAME=$(az storage account list --resource-group $RESOURCE_GROUP --query 
 az storage account delete --name $STORAGE_NAME --resource-group $RESOURCE_GROUP --yes
 
 # Get and delete Application Insights
-APP_INSIGHTS_NAME=$(az monitor app-insights component list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+APP_INSIGHTS_NAME=$(az monitor app-insights component show --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
 az monitor app-insights component delete --app $APP_INSIGHTS_NAME --resource-group $RESOURCE_GROUP
 
 # Get and delete the Log Analytics workspace
@@ -606,7 +606,7 @@ $STORAGE_NAME=$(az storage account list --resource-group $RESOURCE_GROUP --query
 az storage account delete --name $STORAGE_NAME --resource-group $RESOURCE_GROUP --yes
 
 # Get and delete Application Insights
-$APP_INSIGHTS_NAME=$(az monitor app-insights component list --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+$APP_INSIGHTS_NAME=$(az monitor app-insights component show --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
 az monitor app-insights component delete --app $APP_INSIGHTS_NAME --resource-group $RESOURCE_GROUP
 
 # Get and delete the Log Analytics workspace
