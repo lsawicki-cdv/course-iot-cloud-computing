@@ -148,8 +148,9 @@ def _completed(lines):
             yield address
 
 
-def classify_terraform(exercise, apply_lines, graph_dot, gaps, timed_out=False):
-    """Rows for `terraform apply -json` output lines and the `terraform graph` DOT text."""
+def classify_terraform(exercise, apply_lines, graph_dot, gaps, timed_out=False, exit_code=0):
+    """Rows for `terraform apply -json` output lines and the `terraform graph` DOT text; a non-zero `exit_code`
+    that no row explains closes as `drift` `exit N`."""
     gaps = _aws_gaps(gaps, exercise)
     if timed_out:
         return [_row(exercise, 'drift', 'terraform apply', 'apply', error='timeout')]
@@ -177,5 +178,8 @@ def classify_terraform(exercise, apply_lines, graph_dot, gaps, timed_out=False):
     # Closing row on the configuration's key; an address-less error already sits there and keeps its text.
     own = next((row for row in rows if row['target'] == 'terraform apply' and row['status'] != 'newly-covered'), None)
     error = own['error'] if own else (f'{len(errors)} errors' if errors else None)
-    rows.append(_row(exercise, _worst(rows), 'terraform apply', 'apply', error=error))
+    status = _worst(rows)
+    if exit_code and status in ('ok', 'newly-covered'):
+        status, error = 'drift', f'exit {exit_code}'
+    rows.append(_row(exercise, status, 'terraform apply', 'apply', error=error))
     return rows

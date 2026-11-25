@@ -995,6 +995,29 @@ def test_terraform_ignores_warnings_and_non_json_lines():
     assert _statuses(classify.classify_terraform('14', ['not json', warning], GRAPH, [])) == ['ok']
 
 
+def test_terraform_nonzero_exit_without_a_failing_row_is_drift_exit():
+    rows = classify.classify_terraform('14', [], GRAPH, [], exit_code=1)
+    assert _statuses(rows) == ['drift'] and rows[-1]['error'] == 'exit 1'
+    assert _statuses(classify.classify_terraform('14', [], GRAPH, [], exit_code=0)) == ['ok']
+
+
+def test_terraform_nonzero_exit_is_explained_by_a_not_covered_gap_or_consequential_row():
+    gaps = [{'exercise': '14', 'cloud': 'aws', 'target': r'^data\.aws_ssm_parameter\.ubuntu$',
+             'pattern': 'ParameterNotFound', 'reason': 'r'}]
+    lines = [_diag('data.aws_ssm_parameter.ubuntu', 'reading', 'ParameterNotFound')]
+    assert _statuses(classify.classify_terraform('14', lines, GRAPH, gaps, exit_code=1)) == [
+        'not-covered', 'not-covered']
+    lines = [_diag('data.aws_ssm_parameter.ubuntu', 'reading', '501')]
+    assert _statuses(classify.classify_terraform('14', lines, GRAPH, [], exit_code=1))[-1] == 'not-covered'
+
+
+def test_terraform_nonzero_exit_with_only_newly_covered_rows_is_drift_exit():
+    gaps = [{'exercise': '15', 'cloud': 'aws', 'target': 'aws_s3_bucket', 'reason': 'was missing'}]
+    lines = [json.dumps({'type': 'apply_complete', 'hook': {'resource': {'addr': 'aws_s3_bucket.b'}}})]
+    rows = classify.classify_terraform('15', lines, GRAPH, gaps, exit_code=2)
+    assert rows[-1]['status'] == 'drift' and rows[-1]['error'] == 'exit 2'
+
+
 def test_terraform_timeout_is_drift_timeout():
     rows = classify.classify_terraform('14', [], GRAPH, [], timed_out=True)
     assert _statuses(rows) == ['drift'] and rows[0]['error'] == 'timeout'
@@ -1041,14 +1064,16 @@ case "$1" in
   sts) echo "${FAKE_ACCOUNT:-000000000000}" ;;
   s3) echo "NotImplemented: s3" >&2; exit 254 ;;
   cloudformation)
-    if [ "$2" = deploy ]; then [ -n "$DEPLOY_SLEEP" ] && exec sleep "$DEPLOY_SLEEP"; echo "Failed to create the stack" >&2; exit 255; fi
+    if [ "$2" = deploy ]; then [ -n "$DEPLOY_SLEEP" ] && exec sleep "$DEPLOY_SLEEP"; [ -n "$DEPLOY_OK" ] && exit 0; echo "Failed to create the stack" >&2; exit 255; fi
     echo "Handler NotImplemented in the emulator" ;;
 esac
 '''
 FAKE_TERRAFORM = '''echo "$PWD $1 $AWS_ENDPOINT_URL" >> "$OUT/terraform-calls"
 case "$1" in
   graph) [ -n "$GRAPH_FAIL" ] && { echo graph-broken >&2; exit 1; }; echo "digraph {}" ;;
-  apply) [ -n "$APPLY_SLEEP" ] && sleep "$APPLY_SLEEP"; echo '{"type":"diagnostic","diagnostic":{"severity":"error","summary":"Bad","detail":"d","address":"aws_x.y"}}'; exit 1 ;;
+  apply) [ -n "$APPLY_SLEEP" ] && sleep "$APPLY_SLEEP"; [ "$APPLY_MODE" = quiet ] && exit 1
+         [ "$APPLY_MODE" = 501 ] && { echo '{"type":"diagnostic","diagnostic":{"severity":"error","summary":"Bad","detail":"501 NotImplemented","address":"aws_x.y"}}'; exit 1; }
+         echo '{"type":"diagnostic","diagnostic":{"severity":"error","summary":"Bad","detail":"d","address":"aws_x.y"}}'; exit 1 ;;
 esac
 '''
 FAKE_CFN_LINT = '''case "$PWD" in *12-faas*) echo "aws/template.yaml:3:1:E2531:deprecated runtime"; exit 2 ;; esac'''
@@ -1283,7 +1308,65 @@ def test_raw_log_of_an_earlier_run_is_not_counted(aws_env, monkeypatch):
     commit_repo(repo, {'2-iaas/aws/a.sh': 'true\n'})
     common.write_raw_call('2-iaas/aws/a.sh', '1', ['aws', 's3', 'ls'], 1, 'NotImplemented', False)
     run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
-    assert [row['status'] for row in common.read_rows() if row['status'] != 'pending'] == ['ok']
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error']) for row in rows] == [('infrastructure', 'no aws calls recorded')]
+
+
+def test_script_that_never_calls_the_shim_is_infrastructure(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'2-iaas/aws/a.sh': 'echo done\n'})
+    run_aws(monkeypatch, repo, [SCRIPT_ENTRY])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error'], row['check']) for row in rows] == [
+        ('infrastructure', 'no aws calls recorded', 'run')]
+
+
+def test_marker_script_without_calls_keeps_the_sample_row_and_closes_infrastructure(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'9-storage-nosql/aws/a.sh': 'echo "run_sample has caught an error: boom"\n'})
+    venv_bin = common.base_dir() / 'venvs' / '9-storage-nosql_aws' / 'bin'
+    venv_bin.mkdir(parents=True)
+    fake_script(venv_bin / 'python3', 'true\n')
+    entry = {'exercise': '9', 'kind': 'script', 'directory': '9-storage-nosql', 'script': 'aws/a.sh',
+             'working_directory': 'aws', 'marker': 'run_sample has caught an error'}
+    run_aws(monkeypatch, repo, [entry])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert sorted((row['check'], row['status']) for row in rows) == [('run', 'infrastructure'), ('run_sample', 'drift')]
+    assert {row['check']: row['error'] for row in rows}['run'] == 'no aws calls recorded'
+
+
+@pytest.mark.parametrize('deploy_ok', ['', '1'])
+def test_deploy_whose_shim_never_logged_is_infrastructure(aws_env, monkeypatch, tmp_path, deploy_ok):
+    repo, _ = aws_env
+    commit_repo(repo, {'12-faas/aws/template.yaml': 'x'})
+    broken = tmp_path / 'broken-python'
+    fake_script(broken, 'exit 1\n')
+    monkeypatch.setenv('API_CHECK_PYTHON', str(broken))
+    if deploy_ok:
+        monkeypatch.setenv('DEPLOY_OK', '1')
+    run_aws(monkeypatch, repo, [CFN_ENTRY])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error']) for row in rows] == [('infrastructure', 'no aws calls recorded')]
+
+
+def test_terraform_apply_exit_without_diagnostic_is_drift_exit(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'14-vm/aws/main.tf': 'x'})
+    entry = {'exercise': '14', 'kind': 'terraform', 'directory': '14-vm', 'working_directory': 'aws'}
+    monkeypatch.setenv('APPLY_MODE', 'quiet')
+    run_aws(monkeypatch, repo, [entry])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [(row['status'], row['error']) for row in rows] == [('drift', 'exit 1')]
+
+
+def test_terraform_apply_exit_with_501_diagnostic_stays_not_covered(aws_env, monkeypatch):
+    repo, _ = aws_env
+    commit_repo(repo, {'14-vm/aws/main.tf': 'x'})
+    entry = {'exercise': '14', 'kind': 'terraform', 'directory': '14-vm', 'working_directory': 'aws'}
+    monkeypatch.setenv('APPLY_MODE', '501')
+    run_aws(monkeypatch, repo, [entry])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    assert [row['status'] for row in rows] == ['not-covered', 'not-covered']
 
 
 def test_terraform_graph_failure_is_logged_and_classification_goes_on(aws_env, monkeypatch):

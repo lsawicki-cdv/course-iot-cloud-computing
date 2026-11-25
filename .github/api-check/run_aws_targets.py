@@ -121,6 +121,12 @@ def close_on_timeout(rows):
     rows[-1].update(status='drift', error='timeout', reason=None)
 
 
+def close_without_calls(rows, calls):
+    """A finished script or deploy that logged no `aws` call means the recording is broken."""
+    if not calls:
+        rows[-1].update(status='infrastructure', error='no aws calls recorded', reason=None)
+
+
 def run_cfn_lint(entry, root, where):
     target, check, layer = key_of(entry)
     log = common.log_path(f"aws-cfn-lint-{entry['exercise']}.log")
@@ -157,9 +163,12 @@ def run_script(entry, root, env, gaps, key):
         code = run_group(command, log, directory / entry['working_directory'], SCRIPT_TIMEOUT, env)
         output = log.read_text(errors='replace')
     sample = [classify.classify_sample_output(exercise, output, gaps)] if entry.get('marker') and code is not None else []
-    rows = classify.classify_script(exercise, key, raw_calls(key), gaps, extra_rows=sample)
+    calls = raw_calls(key)
+    rows = classify.classify_script(exercise, key, calls, gaps, extra_rows=sample)
     if code is None:
         close_on_timeout(rows)
+    else:
+        close_without_calls(rows, calls)
     write_rows(rows)
 
 
@@ -189,6 +198,8 @@ def run_cloudformation(entry, root, env, gaps, key):
     rows = classify.classify_script(entry['exercise'], key, calls, gaps)
     if code is None:  # killed before the shim could record it: a deploy is a waiting call
         rows[-1].update(status='not-covered', error='timeout', reason=None)
+    else:
+        close_without_calls(rows, calls)
     write_rows(rows)
 
 
@@ -208,7 +219,8 @@ def run_terraform(entry, root, env, gaps, key):
         code = run_group(['terraform', 'apply', '-auto-approve', '-json', '-input=false'], log, directory,
                          TERRAFORM_TIMEOUT, env)
         lines = log.read_text(errors='replace').splitlines()
-    write_rows(classify.classify_terraform(exercise, lines, graph, gaps, timed_out=code is None))
+    write_rows(classify.classify_terraform(exercise, lines, graph, gaps, timed_out=code is None,
+                                           exit_code=code or 0))
 
 
 def run_target(entry, root, env, gaps):
