@@ -54,7 +54,7 @@ flowchart TD
     shim_aws -- "call log" --> classify["classify.py: status per call<br/>and per Terraform diagnostic"]
     classify --> aws_targets
 
-    results[("results.jsonl<br/>every check step adds its rows")]
+    results[("results.jsonl<br/>rows from static, python,<br/>cfn-lint and targets")]
     az_targets -.-> results
     aws_targets -.-> results
     results -.-> az_summary
@@ -63,9 +63,11 @@ flowchart TD
     aws_summary --> out_aws(["job summary: Daily API check: aws"])
 ```
 
-Every check step writes its rows to `$RUNNER_TEMP/api-check/results.jsonl` (the dotted arrows stand for all of
-them); `summary.py` turns them into the job summary and fails the job on `missing-command`, `missing-flag`, `drift` or
-`infrastructure`.
+The `static`, `python`, `cfn-lint` and `targets` steps write their rows to `$RUNNER_TEMP/api-check/results.jsonl` (the
+dotted arrows from the two `targets` steps stand for all of them). Steps that write no rows — installs, `emulator`,
+`identity`, `pytest` — reach `summary.py` through the step outcomes the workflow passes in (`STEPS_JSON`): a failed one
+becomes an `infrastructure` row. `summary.py` turns all of it into the job summary and fails the job on
+`missing-command`, `missing-flag`, `drift` or `infrastructure`.
 
 ### Job `azure`
 
@@ -76,7 +78,7 @@ them); `summary.py` turns them into the job summary and fails the job on `missin
 | `static` | `check_cli.py --cloud azure` | Every `az …` command and its `--flags` in the readmes and scripts still exist (`az <command> --help`) |
 | `python` | `check_python.py --cloud azure` | Each Azure-side `requirements.txt` installs as pinned and every import in the exercise's Python files resolves |
 | `targets` | `run_azure_targets.py` | `az bicep build` of exercises 12 and 13 (errors and BCP081 = retired API version); `terraform init` + `validate` of 14, 15, 18; exercise 9's Cosmos DB sample against the Cosmos DB Linux emulator (Docker, `127.0.0.1:8081`) |
-| `summary` | `summary.py --cloud azure` | Writes the job summary; fails the job on drift |
+| `summary` | `summary.py --cloud azure` | Writes the job summary; fails the job on `missing-command`, `missing-flag`, `drift` or `infrastructure` |
 
 ### Job `aws`
 
@@ -90,7 +92,7 @@ them); `summary.py` turns them into the job summary and fails the job on `missin
 | `python` | `check_python.py --cloud aws` | Each `aws/` folder's packages install (its own `requirements.txt`, or the latest `boto3`) and its imports resolve |
 | `cfn-lint` | `run_aws_targets.py --cfn-lint` | The CloudFormation templates of 12 and 13 pass `cfn-lint` (e.g. no deprecated Lambda runtime) |
 | `targets` | `run_aws_targets.py` | Runs the exercises' AWS scripts, deploys the CloudFormation templates and applies the Terraform configurations against the emulator (list below) |
-| `summary` | `summary.py --cloud aws` | Writes the job summary; fails the job on drift |
+| `summary` | `summary.py --cloud aws` | Writes the job summary; fails the job on `missing-command`, `missing-flag`, `drift` or `infrastructure` |
 
 AWS targets (from `targets.yml`): the scripts `aws/aws-*.sh` of exercises 2, 3, 4 (two), 6 (two), 7, 8, 9, 10 and 11;
 CloudFormation stacks of 12 and 13; Terraform `aws/` of 14 and 15. Exercise 5's AWS script (Elastic Beanstalk `eb`
