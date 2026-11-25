@@ -13,6 +13,60 @@ or pull requests. A real deployment is still the end-to-end check of an exercise
 Both jobs run on `ubuntu-latest`. Every check step runs even when an earlier one failed (`if: always()`), and the last
 step turns the results into the job summary and the job's pass/fail.
 
+```mermaid
+flowchart TD
+    trigger(["schedule 05:00 UTC or Run workflow"])
+
+    subgraph azure["Job azure"]
+        direction TB
+        az_install["install-az · install-terraform · install-checker"]
+        az_pytest["pytest: checker tests"]
+        az_static["static: check_cli.py --cloud azure<br/>az commands and flags (help check)"]
+        az_python["python: check_python.py --cloud azure<br/>pinned requirements, imports"]
+        az_targets["targets: run_azure_targets.py<br/>bicep build · terraform validate<br/>exercise 9 on the Cosmos DB emulator"]
+        az_summary["summary: summary.py --cloud azure"]
+        az_install --> az_pytest --> az_static --> az_python --> az_targets --> az_summary
+    end
+
+    subgraph aws["Job aws"]
+        direction TB
+        aws_install["install-aws-cli · install-terraform<br/>install-aws-emulator · install-checker"]
+        aws_emulator["emulator: AWS Emulator on 127.0.0.1:9297<br/>identity: account 000000000000"]
+        aws_pytest["pytest: checker tests"]
+        aws_static["static: check_cli.py --cloud aws<br/>aws commands and flags (help check)"]
+        aws_python["python: check_python.py --cloud aws<br/>aws/ packages, imports"]
+        aws_cfn["cfn-lint: run_aws_targets.py --cfn-lint"]
+        aws_targets["targets: run_aws_targets.py<br/>scripts · CloudFormation · Terraform"]
+        aws_summary["summary: summary.py --cloud aws"]
+        aws_install --> aws_emulator --> aws_pytest --> aws_static --> aws_python --> aws_cfn --> aws_targets --> aws_summary
+    end
+
+    subgraph shims["shims on PATH"]
+        shim_aws["aws: real CLI with a timeout,<br/>records every call (masked)"]
+        shim_curl["curl: only repo raw files,<br/>checkip, loopback"]
+        shim_psql["psql: never connects"]
+    end
+
+    trigger --> az_install
+    trigger --> aws_install
+    aws_targets -- "runs the exercise scripts" --> shims
+    shim_aws -- "API calls" --> emu[("AWS Emulator")]
+    shim_aws -- "call log" --> classify["classify.py: status per call<br/>and per Terraform diagnostic"]
+    classify --> aws_targets
+
+    results[("results.jsonl<br/>every check step adds its rows")]
+    az_targets -.-> results
+    aws_targets -.-> results
+    results -.-> az_summary
+    results -.-> aws_summary
+    az_summary --> out_az(["job summary: Daily API check: azure"])
+    aws_summary --> out_aws(["job summary: Daily API check: aws"])
+```
+
+Every check step writes its rows to `$RUNNER_TEMP/api-check/results.jsonl` (the dotted arrows stand for all of
+them); `summary.py` turns them into the job summary and fails the job on `missing-command`, `missing-flag`, `drift` or
+`infrastructure`.
+
 ### Job `azure`
 
 | Step `id` | Runs | Checks |
