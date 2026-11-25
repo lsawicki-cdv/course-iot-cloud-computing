@@ -8,7 +8,7 @@ In this exercise, you will deploy a small Python web app to a Platform as a Serv
 
 AWS has two services for this, and you can try both:
 - **Option A: AWS App Runner** - fully managed, like App Service: it builds the code from your GitHub repository and gives it an HTTPS address. You never see the servers
-- **Option B: AWS Elastic Beanstalk** - deploys the code from the terminal, like `az webapp up`, onto an EC2 virtual machine that it creates and manages for you. You can still see (and connect to) that virtual machine
+- **Option B: AWS Elastic Beanstalk** - deploys the code from the terminal, like `az webapp deploy`, onto an EC2 virtual machine that it creates and manages for you. You can still see (and connect to) that virtual machine
 
 The app is the same Flask sample as in the Azure version:
 - `app.py` - the Flask app with two pages: `/` shows a form, `/hello` greets the name sent from the form
@@ -20,8 +20,8 @@ The app is the same Flask sample as in the Azure version:
 |-------------------|----------------------|-----------------------------|
 | App Service plan (F1) | Instance size (0.25 vCPU, 0.5 GB) | EC2 instance (t3.micro) |
 | Web App | App Runner service | Elastic Beanstalk application + environment |
-| `az webapp up` | Service built from your GitHub fork | `eb init` + `eb create` |
-| Redeploy with `az webapp up` | Push to GitHub, then "Deploy" | `eb deploy` |
+| `az webapp create` + `az webapp deploy` | Service built from your GitHub fork | `eb init` + `eb create` |
+| Redeploy with `az webapp deploy` | Push to GitHub, then "Deploy" | `eb deploy` |
 | Startup command (gunicorn, detected automatically) | `apprunner.yaml` | `Procfile` |
 | `https://<app-name>.azurewebsites.net` | `https://<id>.<region>.awsapprunner.com` | `http://<env-name>.<id>.<region>.elasticbeanstalk.com` (HTTP only) |
 | `az webapp log tail` | "Logs" tab in the Console | `eb logs` |
