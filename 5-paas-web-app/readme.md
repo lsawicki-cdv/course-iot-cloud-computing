@@ -16,7 +16,7 @@ The app is the Flask sample from the Microsoft quickstart [Deploy a Python (Djan
 
 - **App Service plan** - the compute (virtual machines) your app runs on, and its price tier. The **F1 (Free)** tier used here is free, but it has limits (60 CPU minutes per day, no custom domains with SSL, the app sleeps when idle)
 - **Web App** - your app in the plan, with the address `https://<app-name>.azurewebsites.net`. The name must be globally unique
-- **Build on deployment** - App Service (its build system, Oryx) detects `requirements.txt`, installs the packages, finds `app.py` and starts it with gunicorn. You don't write a startup command
+- **Build on deployment** - with the app setting `SCM_DO_BUILD_DURING_DEPLOYMENT=true`, App Service (its build system, Oryx) detects `requirements.txt` in the deployed package, installs the packages, finds `app.py` and starts it with gunicorn. You don't write a startup command
 
 ### Tested environments
 Ubuntu 26.04
@@ -68,14 +68,42 @@ Azure Cloud Shell (Bash and PowerShell)
    ```bash
    az group create --name $RESOURCE_GROUP --location $LOCATION
    ```
-   4. Create the App Service plan and the Web App, and deploy the code from the current folder (it takes a few minutes)
+   4. Create the App Service plan and the Web App, build the package and deploy it (it takes a few minutes)
    ```bash
-      az webapp up \
+      # Create the App Service plan: a free (F1) Linux plan
+      az appservice plan create \
          --resource-group $RESOURCE_GROUP \
+         --name $APP_NAME-plan \
          --location $LOCATION \
+         --sku F1 \
+         --is-linux
+   ```
+   ```bash
+      # Create the Web App in the plan, with the Python runtime
+      az webapp create \
+         --resource-group $RESOURCE_GROUP \
+         --plan $APP_NAME-plan \
          --name $APP_NAME \
-         --runtime PYTHON:3.11 \
-         --sku F1
+         --runtime PYTHON:3.11
+   ```
+   ```bash
+      # Turn on the build on deployment, so App Service installs `requirements.txt` and starts the app
+      az webapp config appsettings set \
+         --resource-group $RESOURCE_GROUP \
+         --name $APP_NAME \
+         --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true
+   ```
+   ```bash
+      # Pack the app's files into a zip package (without the local `.venv` and the AWS variant)
+      zip -r app.zip . -x '.venv/*' 'aws/*' 'app.zip'
+   ```
+   ```bash
+      # Deploy the package to the Web App
+      az webapp deploy \
+         --resource-group $RESOURCE_GROUP \
+         --name $APP_NAME \
+         --src-path app.zip \
+         --type zip
    ```
    5. Check connection to the web app
    ```bash
@@ -95,14 +123,19 @@ Azure Cloud Shell (Bash and PowerShell)
    ```bash
    nano templates/index.html
    ```
-   8. Redeploy the app with the same command and refresh the page in the browser
+   8. Pack the app again, redeploy it with the same `az webapp deploy` command and refresh the page in the browser
    ```bash
-      az webapp up \
+      rm -f app.zip
+   ```
+   ```bash
+      zip -r app.zip . -x '.venv/*' 'aws/*' 'app.zip'
+   ```
+   ```bash
+      az webapp deploy \
          --resource-group $RESOURCE_GROUP \
-         --location $LOCATION \
          --name $APP_NAME \
-         --runtime PYTHON:3.11 \
-         --sku F1
+         --src-path app.zip \
+         --type zip
    ```
 
    **Option B: Using PowerShell**
@@ -127,14 +160,42 @@ Azure Cloud Shell (Bash and PowerShell)
    ```powershell
    az group create --name $RESOURCE_GROUP --location $LOCATION
    ```
-   4. Create the App Service plan and the Web App, and deploy the code from the current folder (it takes a few minutes)
+   4. Create the App Service plan and the Web App, build the package and deploy it (it takes a few minutes)
    ```powershell
-      az webapp up `
+      # Create the App Service plan: a free (F1) Linux plan
+      az appservice plan create `
          --resource-group $RESOURCE_GROUP `
+         --name $APP_NAME-plan `
          --location $LOCATION `
+         --sku F1 `
+         --is-linux
+   ```
+   ```powershell
+      # Create the Web App in the plan, with the Python runtime
+      az webapp create `
+         --resource-group $RESOURCE_GROUP `
+         --plan $APP_NAME-plan `
          --name $APP_NAME `
-         --runtime PYTHON:3.11 `
-         --sku F1
+         --runtime PYTHON:3.11
+   ```
+   ```powershell
+      # Turn on the build on deployment, so App Service installs `requirements.txt` and starts the app
+      az webapp config appsettings set `
+         --resource-group $RESOURCE_GROUP `
+         --name $APP_NAME `
+         --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true
+   ```
+   ```powershell
+      # Pack only the files the app needs into a zip package
+      Compress-Archive -Path app.py, requirements.txt, static, templates -DestinationPath app.zip -Force
+   ```
+   ```powershell
+      # Deploy the package to the Web App
+      az webapp deploy `
+         --resource-group $RESOURCE_GROUP `
+         --name $APP_NAME `
+         --src-path app.zip `
+         --type zip
    ```
    5. Check connection to the web app
    ```powershell
@@ -154,18 +215,20 @@ Azure Cloud Shell (Bash and PowerShell)
    ```powershell
    nano templates/index.html
    ```
-   8. Redeploy the app with the same command and refresh the page in the browser
+   8. Pack the app again, redeploy it with the same `az webapp deploy` command and refresh the page in the browser
    ```powershell
-      az webapp up `
+      Compress-Archive -Path app.py, requirements.txt, static, templates -DestinationPath app.zip -Force
+   ```
+   ```powershell
+      az webapp deploy `
          --resource-group $RESOURCE_GROUP `
-         --location $LOCATION `
          --name $APP_NAME `
-         --runtime PYTHON:3.11 `
-         --sku F1
+         --src-path app.zip `
+         --type zip
    ```
 3. Explore the Web App in the Azure Portal (App Services → your app)
    1. Overview: the default domain, the App Service plan and its pricing tier (F1)
-   2. Deployment Center → Logs: the deployments you made with `az webapp up`
+   2. Deployment Center → Logs: the deployments you made with `az webapp deploy`
    3. Log stream: the same logs as `az webapp log tail`
    4. Configuration → General settings: the Python version and the (empty) startup command, which means App Service detected gunicorn and `app.py` itself
    5. Scale up (App Service plan): the other price tiers and what they add
