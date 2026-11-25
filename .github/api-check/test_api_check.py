@@ -47,6 +47,21 @@ def test_mask_leaves_plain_text():
     assert common.mask('aws s3 ls --region eu-west-2') == 'aws s3 ls --region eu-west-2'
 
 
+def raw_argv(argv):
+    common.write_raw_call('s.sh', '1', argv, 0, '', False)
+    return json.loads(common.raw_log_path().read_text().splitlines()[-1])['argv']
+
+
+def test_raw_log_masks_each_element_and_keeps_unbalanced_quotes():
+    argv = ['ssm', 'put-parameter', '--value', "TOKEN='x", '--master-user-password', 'p w',
+            '--db-password=abc', '--environment', 'Variables={API_KEY=k1,OTHER=v}',
+            'https://x/api?code=k', '--region', 'eu-west-2']
+    assert raw_argv(argv) == [
+        'ssm', 'put-parameter', '--value', 'TOKEN=***', '--master-user-password', '***',
+        '--db-password=***', '--environment', 'Variables={API_KEY=***,OTHER=v}',
+        'https://x/api?code=***', '--region', 'eu-west-2']
+
+
 def test_results_last_row_wins():
     key = dict(cloud='aws', exercise='7', layer='emulator', target='t', file='f.sh', line=3, check='run')
     common.write_row(status='pending', **key)

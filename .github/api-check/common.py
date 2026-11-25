@@ -3,7 +3,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 import tempfile
 from pathlib import Path
@@ -28,6 +27,9 @@ _VALUE = r'''"[^"]*"|'[^']*'|[^\s,}&"']+'''
 _FLAG_VALUE = re.compile(rf'(--{_SECRET}\s+)(?:{_VALUE})', re.IGNORECASE)
 _NAME_VALUE = re.compile(rf'(\b{_SECRET}=)(?:{_VALUE})', re.IGNORECASE)
 _CODE_VALUE = re.compile(r'([?&]code=)[^&\s"\']+')
+_FLAG_ONLY = re.compile(rf'--{_SECRET}', re.IGNORECASE)
+_FLAG_EQUALS = re.compile(rf'(--{_SECRET}=).*', re.IGNORECASE | re.DOTALL)
+_NAME_EQUALS = re.compile(rf'(\b{_SECRET}=)[^,}}&]*', re.IGNORECASE)
 
 
 def base_dir():
@@ -49,6 +51,21 @@ def mask(text):
     text = _FLAG_VALUE.sub(r'\1***', text)
     text = _NAME_VALUE.sub(r'\1***', text)
     return _CODE_VALUE.sub(r'\1***', text)
+
+
+def mask_argv(argv):
+    """Mask each argv element on its own, so unbalanced quotes cannot break it."""
+    masked = []
+    previous = ''
+    for element in argv:
+        if _FLAG_ONLY.fullmatch(previous):
+            masked.append('***')
+        else:
+            element = _FLAG_EQUALS.sub(r'\1***', element)
+            element = _NAME_EQUALS.sub(r'\1***', element)
+            masked.append(_CODE_VALUE.sub(r'\1***', element))
+        previous = element
+    return masked
 
 
 def write_row(**fields):
@@ -106,7 +123,7 @@ def raw_log_path():
 
 def write_raw_call(script, line, argv, exit_code, stderr, timed_out):
     """Append one masked aws call to the raw log."""
-    masked = shlex.split(mask(shlex.join(argv)))
+    masked = mask_argv(argv)
     entry = {'script': script, 'line': line, 'argv': masked, 'exit': exit_code,
              'stderr': mask(stderr), 'timed_out': timed_out}
     path = raw_log_path()
