@@ -4,7 +4,16 @@
 # optional `link`. The exercise 9 boto3 sample's message is matched by `pattern` alone; an entry with only a
 # `target` applies to calls, never to the sample.
 skip: []
-emulator_gaps: []
+emulator_gaps:
+  - {exercise: '2', cloud: aws, target: '^ec2 run-instances', pattern: '/aws/service/canonical/ubuntu/', reason: 'the emulator has no Canonical public SSM parameters (/aws/service/canonical/ubuntu/...), so the Ubuntu AMI cannot be resolved'}
+  - {exercise: '3', cloud: aws, target: '^ec2 create-launch-template', pattern: '/aws/service/canonical/ubuntu/', reason: 'the emulator has no Canonical public SSM parameters (/aws/service/canonical/ubuntu/...), so the Ubuntu AMI cannot be resolved'}
+  - {exercise: '4', cloud: aws, target: '^ec2 run-instances', pattern: '/aws/service/canonical/ubuntu/', reason: 'the emulator has no Canonical public SSM parameters (/aws/service/canonical/ubuntu/...), so the Ubuntu AMI cannot be resolved'}
+  - {exercise: '6', cloud: aws, target: '^ec2 run-instances', pattern: '/aws/service/canonical/ubuntu/', reason: 'the emulator has no Canonical public SSM parameters (/aws/service/canonical/ubuntu/...), so the Ubuntu AMI cannot be resolved'}
+  - {exercise: '14', cloud: aws, target: '^data\.aws_ssm_parameter\.ubuntu$', pattern: '/aws/service/canonical/ubuntu/', reason: 'the emulator has no Canonical public SSM parameters (/aws/service/canonical/ubuntu/...), so the Ubuntu AMI cannot be resolved'}
+  - {exercise: '4', cloud: aws, target: '^ecs wait tasks-running', pattern: 'TasksRunning failed', reason: 'the emulator does not run Fargate tasks, so they go to STOPPED instead of RUNNING'}
+  - {exercise: '10', cloud: aws, target: '^logs tail', pattern: 'log group does not exist', reason: 'the emulator does not create the Lambda log group when the function is invoked'}
+  - {exercise: '12', cloud: aws, target: '^cloudformation deploy', pattern: 'InvokedViaFunctionUrl', reason: 'the emulator does not support the InvokedViaFunctionUrl property of AWS::Lambda::Permission'}
+  - {exercise: '15', cloud: aws, target: '^module\.storage_route\.aws_s3_bucket\.telemetry$', pattern: 'ListTagsForResource', reason: 'the emulator does not serve the S3 Control endpoint the provider uses to read bucket tags'}
 python:
   parent_requirements: [6-paas-iot-mqtt/aws]
   skip_imports: []

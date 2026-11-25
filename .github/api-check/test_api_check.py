@@ -1316,3 +1316,66 @@ def test_workflow_emulator_reads_credentials_in_one_call():
     run = step_by_id('aws', 'emulator')['run']
     assert run.count('import configparser') == 1
     assert run.index('::add-mask::') < run.index('>> "$GITHUB_ENV"')
+
+
+def _run2_rows():
+    """Rows the classifier writes for the run-2 errors, with the shipped emulator_gaps."""
+    gaps = common.load_targets()['emulator_gaps']
+    ssm = 'An error occurred (InvalidAMIID.NotFound) when calling the RunInstances operation: The image id ' \
+          "'[resolve:ssm:/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id]'"
+    lt = 'An error occurred (SsmInvalidParameter) when calling the CreateLaunchTemplate operation: The ' \
+         'following aliases are invalid: /aws/service/canonical/ubuntu/server/26.04/stable/current/amd6'
+    task = 'Waiter TasksRunning failed: Waiter encountered a terminal failure state: For expression ' \
+           '"tasks[].lastStatus" we matched expected path: "STOPPED" at least once'
+    cfn = 'Resource handler returned message: "this emulator does not apply the InvokedViaFunctionUrl ' \
+          'property of AWS::Lambda::Permission"'
+    s3 = 'listing tags for S3 (Simple Storage) Bucket (b): operation error S3 Control: ListTagsForResource, ' \
+         'https response error StatusCode: 0'
+    scripts = {
+        '2': [_call(['ec2', 'run-instances'], 254, ssm, line=20), _call(['ec2', 'wait', 'instance-running'], 255, 'x')],
+        '3': [_call(['ec2', 'create-launch-template'], 254, lt, line=9),
+              _call(['autoscaling', 'create-auto-scaling-group'], 254, 'ValidationError: launch template does not exist', line=30)],
+        '4': [_call(['ec2', 'run-instances'], 254, ssm, line=12)],
+        '6': [_call(['ec2', 'run-instances'], 254, ssm, line=12)],
+        '10': [_call(['logs', 'tail'], 254, 'An error occurred (ResourceNotFoundException) when calling the '
+                     'FilterLogEvents operation: The specified log group does not exist.', line=40)],
+        '12': [_call(['cloudformation', 'deploy'], 255, cfn)],
+    }
+    rows = []
+    for exercise, calls in scripts.items():
+        rows += classify.classify_script(exercise, f'{exercise}/aws/x.sh', calls, gaps)
+    rows += classify.classify_script('4', '4/aws/aws-ecs-fargate.sh', [
+        _call(['ecs', 'wait', 'tasks-running'], 255, task, line=91),
+        _call(['ec2', 'describe-network-interfaces'], 254, 'InvalidNetworkInterfaceID.NotFound', line=105)], gaps)
+    rows += classify.classify_terraform('14', [
+        _diag('data.aws_ssm_parameter.ubuntu', 'reading SSM Parameter',
+              "(/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id): couldn't find resource")],
+        '', gaps)
+    rows += classify.classify_terraform('15', [
+        _diag('module.storage_route.aws_s3_bucket.telemetry', 'reading tags', s3),
+        _diag('module.device.aws_iot_thing_principal_attachment.device', 'attaching', 'NotImplemented')], '', gaps)
+    return rows
+
+
+def test_run2_errors_are_covered_by_the_shipped_emulator_gaps():
+    rows = _run2_rows()
+    by = {(row['exercise'], row['check'], row['target']): row for row in rows}
+    for key in [('2', 'ec2 run-instances', '2/aws/x.sh'), ('3', 'ec2 create-launch-template', '3/aws/x.sh'),
+                ('4', 'ec2 run-instances', '4/aws/x.sh'), ('6', 'ec2 run-instances', '6/aws/x.sh'),
+                ('4', 'ecs wait', '4/aws/aws-ecs-fargate.sh'), ('10', 'logs tail', '10/aws/x.sh'),
+                ('12', 'cloudformation deploy', '12/aws/x.sh'),
+                ('14', 'apply', 'data.aws_ssm_parameter.ubuntu'),
+                ('15', 'apply', 'module.storage_route.aws_s3_bucket.telemetry')]:
+        assert by[key]['status'] == 'not-covered' and by[key]['reason'], key
+    assert by[('3', 'autoscaling create-auto-scaling-group', '3/aws/x.sh')]['status'] == 'consequential'
+    assert by[('4', 'ec2 describe-network-interfaces', '4/aws/aws-ecs-fargate.sh')]['status'] == 'consequential'
+    assert by[('2', 'ec2 wait', '2/aws/x.sh')]['status'] == 'consequential'
+    closing = [row for row in rows if row['check'] == 'run' or row['target'] == 'terraform apply']
+    assert len(closing) == 9 and all(row['status'] not in summary.FAILING for row in closing)
+    assert all(row['status'] not in summary.FAILING for row in rows)
+
+
+def test_run2_rows_make_summary_exit_zero(capsys):
+    for row in _run2_rows():
+        common.write_row(**row)
+    assert summary.main(['--cloud', 'aws']) == 0
