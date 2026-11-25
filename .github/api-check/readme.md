@@ -1,12 +1,20 @@
 # Daily API check
 
-The checker behind `.github/workflows/cloud-api-check.yml`. Every day at 05:00 UTC (and on demand) it checks that a
-student following the exercises today would not hit a changed Azure or AWS API: renamed or removed CLI commands and
-flags, retired Bicep API versions, Terraform provider changes, pinned Python packages that no longer install, and AWS
-scripts and templates that the AWS API now rejects.
+The repository's only CI: the checker behind the GitHub Actions workflow "Cloud API check"
+(`.github/workflows/cloud-api-check.yml`). Every day at 05:00 UTC (and on demand: Actions → Cloud API check → Run
+workflow) it checks that a student following the exercises today would not hit a changed Azure or AWS API: renamed or
+removed CLI commands and flags, retired Bicep API versions, Terraform provider changes, pinned Python packages that no
+longer install, and AWS scripts and templates that the AWS API now rejects.
 
 It does **not** deploy anything to a real Azure subscription or AWS account, needs no secret, and does not run on push
 or pull requests. A real deployment is still the end-to-end check of an exercise.
+
+Where to look after a run: open the run on the Actions page and scroll to the job summary of each job ("Daily API
+check: azure" / "Daily API check: aws"). A red job means something in an exercise no longer works with today's CLI,
+IaC tooling or packages, or that the check itself could not run. The summary says which (see [Statuses](#statuses)).
+
+The `readme.md` lives here rather than in `.github/` on purpose: GitHub shows a `.github/README.md` instead of the
+root `readme.md` on the repository's front page.
 
 ## What happens where
 
