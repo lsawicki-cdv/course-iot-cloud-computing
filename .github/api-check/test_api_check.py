@@ -1240,7 +1240,8 @@ def step_by_id(name, step_id):
 def test_workflow_permissions_and_triggers():
     data = workflow()
     assert 'pull_request_target' not in data['on']
-    assert set(data['on']) == {'workflow_dispatch'}
+    assert set(data['on']) == {'workflow_dispatch', 'schedule'}
+    assert data['on']['schedule'] == [{'cron': '0 5 * * *'}]
     assert data['permissions'] == {'contents': 'read'}
     assert all(job.get('permissions', {'contents': 'read'}) == {'contents': 'read'} for job in data['jobs'].values())
 
