@@ -19,9 +19,20 @@ import common
 import summary
 
 
+RUNNER_ENV = (
+    'GITHUB_STEP_SUMMARY', 'STEPS_JSON', 'API_CHECK_PYTHON', 'API_CHECK_REAL_AWS', 'API_CHECK_REAL_CURL',
+    'API_CHECK_SCRIPT', 'API_CHECK_LINE', 'API_CHECK_AWS_TIMEOUT', 'AWS_ENDPOINT_URL', 'AWS_CA_BUNDLE',
+    'AWS_CONFIG_FILE', 'AWS_SHARED_CREDENTIALS_FILE', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY',
+    'AWS_SESSION_TOKEN', 'AWS_REGION', 'AWS_DEFAULT_REGION', 'AWS_PROFILE',
+)
+
+
 @pytest.fixture(autouse=True)
 def results_dir(tmp_path, monkeypatch):
     monkeypatch.setenv('RUNNER_TEMP', str(tmp_path))
+    # The runner's own variables must not reach the tests (the job exports them to every step).
+    for name in RUNNER_ENV:
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_mask_values():
