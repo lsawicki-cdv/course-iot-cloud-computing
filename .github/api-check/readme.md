@@ -77,11 +77,14 @@ so the repository is never changed; exercise 7's `<your-…>` placeholders are f
 
 ## targets.yml
 
-- `skip`: commands or flags the help check cannot validate. Each entry has a `reason`.
+- `skip`: commands or flags the help check cannot validate, as `{target: "az foo bar" or "az foo bar --flag",
+  reason}`. Empty today.
+- `python`: `parent_requirements` (an `aws/` folder that installs its parent exercise's `requirements.txt`, today
+  6-paas-iot-mqtt/aws) and `skip_imports` (imports not to resolve, each with a `reason`; empty today).
 - `emulator_gaps`: places where AWS Emulator differs from AWS (today: no Canonical Ubuntu SSM parameters, no Fargate
-  tasks, no Lambda log group, no `InvokedViaFunctionUrl`, no S3 Control tags). Each entry has the `exercise`, a
-  `pattern` on the error and/or a `target` on the call or Terraform address, and a `reason`. Real drift is fixed in
-  the exercise, never hidden here.
+  tasks, no Lambda log group, no `InvokedViaFunctionUrl`, no S3 Control tags). Each entry has the `exercise`, `cloud:
+  aws` for the AWS job, a `pattern` on the error and/or a `target` on the call or Terraform address, a `reason`, and
+  optionally a `link` to an emulator issue. Real drift is fixed in the exercise, never hidden here.
 - `azure`, `aws`: the targets each job runs.
 
 ## Run it locally
@@ -103,7 +106,9 @@ set, as the workflow's `emulator` step does.
 ## Safety
 
 - No real cloud credentials exist anywhere in the workflow; the token is read-only (`contents: read`).
-- Both emulators listen on `127.0.0.1` only.
+- Both emulators are reached on `127.0.0.1` only: the Cosmos DB emulator's port is published on `127.0.0.1`, AWS
+  Emulator binds to `127.0.0.1` by default, and the AWS runner refuses to start unless its endpoint is
+  `https://127.0.0.1:<port>`.
 - Passwords, keys and tokens are masked before anything is written to the results or the summary; script output goes
   to files on the runner, not to the public log.
 - Commands found in the readmes are never run through a shell: only their help is read.

@@ -12,4 +12,5 @@ Where to look after a run: open the run on the Actions page and scroll to the jo
 check: azure" / "Daily API check: aws"). A red job means something in an exercise no longer works with today's CLI,
 IaC tooling or packages, or that the check itself could not run. The summary says which.
 
-The workflow needs no cloud account and no secret: Azure is checked offline, AWS against a local emulator.
+The workflow needs no cloud account and no secret: Azure is checked with the local CLI, Bicep, Terraform and the
+Cosmos DB emulator, AWS against a local emulator. It only downloads tools and packages from the internet.
