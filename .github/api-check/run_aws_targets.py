@@ -156,11 +156,10 @@ def run_script(entry, root, env, gaps, key):
         log = common.log_path(f"aws-script-{key.replace('/', '_')}.log")
         code = run_group(command, log, directory / entry['working_directory'], SCRIPT_TIMEOUT, env)
         output = log.read_text(errors='replace')
-    rows = classify.classify_script(exercise, key, raw_calls(key), gaps)
+    sample = [classify.classify_sample_output(exercise, output, gaps)] if entry.get('marker') and code is not None else []
+    rows = classify.classify_script(exercise, key, raw_calls(key), gaps, extra_rows=sample)
     if code is None:
         close_on_timeout(rows)
-    elif entry.get('marker'):
-        rows.insert(-1, classify.classify_sample_output(exercise, output, gaps))
     write_rows(rows)
 
 

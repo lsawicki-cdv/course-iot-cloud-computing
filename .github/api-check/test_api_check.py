@@ -871,6 +871,62 @@ def test_sample_marker_is_drift_unless_gap_matches():
     assert classify.classify_sample_output('9', 'all fine\n', gaps)['status'] == 'ok'
 
 
+TRACEBACK_LOG = """Creating the table
+Traceback (most recent call last):
+  File "dynamodb_sample.py", line 10, in <module>
+    run_sample()
+  File "botocore/validate.py", line 381, in serialize_to_request
+    raise ParamValidationError(report=report.generate_report())
+botocore.exceptions.ParamValidationError: Parameter validation failed:
+Unknown parameter in input: "Foo", must be one of: TableName
+run_sample done
++-------+
+|  Items |
++-------+
+"""
+PARAM_ERROR = 'botocore.exceptions.ParamValidationError: Parameter validation failed:'
+
+
+def test_sample_traceback_without_marker_is_drift_with_the_exception_line():
+    row = classify.classify_sample_output('9', TRACEBACK_LOG, [])
+    assert row['status'] == 'drift' and row['error'] == PARAM_ERROR
+
+
+def test_sample_chained_traceback_picks_the_last_one():
+    out = ('Traceback (most recent call last):\n  File "a.py", line 1\nKeyError: first\n\n'
+           'During handling of the above exception, another exception occurred:\n\n'
+           'Traceback (most recent call last):\n  File "a.py", line 3\nValueError: second\nrun_sample done\n')
+    row = classify.classify_sample_output('9', out, [])
+    assert row['status'] == 'drift' and row['error'] == 'ValueError: second'
+
+
+def test_sample_traceback_matching_a_gap_is_not_covered():
+    gaps = [{'exercise': '9', 'cloud': 'aws', 'pattern': 'ParamValidationError', 'reason': 'emulator differs'}]
+    row = classify.classify_sample_output('9', TRACEBACK_LOG, gaps)
+    assert row['status'] == 'not-covered' and row['reason'] == 'emulator differs'
+    assert row['error'] == PARAM_ERROR
+    other = [{'exercise': '9', 'cloud': 'aws', 'pattern': 'Unknown parameter', 'reason': 'r'}]
+    assert classify.classify_sample_output('9', TRACEBACK_LOG, other)['status'] == 'drift'
+
+
+def test_sample_marker_wins_over_a_traceback():
+    out = TRACEBACK_LOG + 'run_sample has caught an error. Bad request\n'
+    assert classify.classify_sample_output('9', out, [])['error'].startswith('run_sample has caught an error')
+
+
+def test_script_extra_row_counts_in_the_closing_row():
+    sample = classify._row('9', 'drift', 'sample', 'run_sample', error='boom')
+    only = classify.classify_script('9', 's.sh', [_call(['s3', 'ls'])], [], extra_rows=[sample])
+    assert _statuses(only) == ['drift', 'drift'] and only[0]['check'] == 'run_sample'
+    assert only[-1]['check'] == 'run' and only[-1]['error'] == 'run_sample failed'
+    both = classify.classify_script('9', 's.sh', [_call(['s3', 'ls'], 252, 'Unknown options')], [],
+                                    extra_rows=[sample])
+    assert _statuses(both) == ['drift', 'drift', 'drift'] and both[-1]['error'] == '2 calls failed'
+    ok = classify.classify_script('9', 's.sh', [_call(['s3', 'ls'])], [],
+                                  extra_rows=[classify._row('9', 'ok', 'sample', 'run_sample')])
+    assert _statuses(ok) == ['ok', 'ok'] and ok[-1]['error'] is None
+
+
 def _diag(address, summary, detail=''):
     return json.dumps({'@level': 'error', 'type': 'diagnostic', 'diagnostic': {
         'severity': 'error', 'summary': summary, 'detail': detail, 'address': address}})
@@ -1105,6 +1161,26 @@ def test_exercise_9_uses_its_venv_python_and_missing_venv_is_infrastructure(aws_
     fake_script(venv_bin / 'python3', 'echo "run_sample has caught an error: boom"\n')
     run_aws(monkeypatch, repo, [entry])
     assert (out / 'python').read_text().strip() == str(venv_bin / 'python3')
+
+
+def test_marker_script_traceback_only_fails_the_closing_row_with_run_sample(aws_env, monkeypatch):
+    repo, out = aws_env
+    script = ('aws ec2 describe-instances\n'
+              'echo "Traceback (most recent call last):"\n'
+              'echo "  File x.py, line 1"\n'
+              'echo "botocore.exceptions.ParamValidationError: Parameter validation failed:"\n')
+    commit_repo(repo, {'9-storage-nosql/aws/a.sh': script})
+    venv_bin = common.base_dir() / 'venvs' / '9-storage-nosql_aws' / 'bin'
+    venv_bin.mkdir(parents=True)
+    fake_script(venv_bin / 'python3', 'true\n')
+    entry = {'exercise': '9', 'kind': 'script', 'directory': '9-storage-nosql', 'script': 'aws/a.sh',
+             'working_directory': 'aws', 'marker': 'run_sample has caught an error'}
+    run_aws(monkeypatch, repo, [entry])
+    rows = [row for row in common.read_rows() if row['status'] != 'pending']
+    closing = [row for row in rows if row['check'] == 'run']
+    assert len(closing) == 1 and closing[0]['status'] == 'drift' and closing[0]['error'] == 'run_sample failed'
+    sample = [row for row in rows if row['check'] == 'run_sample']
+    assert sample[0]['error'].startswith('botocore.exceptions.ParamValidationError')
 
 
 def test_cfn_lint_one_row_per_template(aws_env, monkeypatch):

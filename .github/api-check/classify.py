@@ -2,9 +2,10 @@
 import json
 import re
 
-from run_azure_targets import classify_sample
+from run_azure_targets import SAMPLE_MARKER, classify_sample
 
 NOT_COVERED = re.compile(r'NotImplemented|\b501\b')
+TRACEBACK = 'Traceback (most recent call last):'
 DOT_EDGE = re.compile(r'"([^"]+)"\s*->\s*"([^"]+)"')
 
 
@@ -44,9 +45,9 @@ def _worst(rows):
     return max((row['status'] for row in rows), key=lambda status: _RANK.get(status, 0), default='ok')
 
 
-def classify_script(exercise, script, calls, gaps):
-    """Rows for the failing calls of one script (raw-log entries) and newly-covered gaps, then one closing
-    row with check `run` (the pending row's key) holding the worst status."""
+def classify_script(exercise, script, calls, gaps, extra_rows=()):
+    """Rows for the failing calls of one script (raw-log entries) and newly-covered gaps, then `extra_rows`
+    (e.g. a sample row), then one closing row with check `run` (the pending row's key) holding the worst status."""
     gaps = _aws_gaps(gaps, exercise)
     rows = []
     seen_not_covered = False
@@ -76,15 +77,26 @@ def classify_script(exercise, script, calls, gaps):
             status = 'consequential'
         seen_not_covered = seen_not_covered or status == 'not-covered'
         rows.append(_row(exercise, status, script, check, script, call['line'], error, reason))
+    call_failures = sum(row['status'] not in ('newly-covered', 'ok') for row in rows)
+    rows.extend(extra_rows)
     failures = sum(row['status'] not in ('newly-covered', 'ok') for row in rows)
-    rows.append(_row(exercise, _worst(rows), script, 'run', error=f'{failures} calls failed' if failures else None))
+    error = None
+    if failures:
+        error = 'run_sample failed' if failures == 1 and not call_failures else f'{failures} calls failed'
+    rows.append(_row(exercise, _worst(rows), script, 'run', error=error))
     return rows
 
 
 def classify_sample_output(exercise, stdout, gaps):
-    """One row for a boto3 sample's stdout: `drift` on the error marker unless a gap matches its message."""
+    """One row for a boto3 sample's output: `drift` on the error marker, or on the last traceback's exception
+    line, unless a gap matches it."""
     sample_gaps = [gap for gap in _aws_gaps(gaps, exercise) if gap.get('pattern')]
     status, error, reason = classify_sample(0, stdout, sample_gaps)
+    if SAMPLE_MARKER not in stdout and TRACEBACK in stdout:
+        lines = stdout[stdout.rindex(TRACEBACK):].splitlines()[1:]
+        error = next((line for line in lines if line and not line[0].isspace()), '')
+        gap = next((gap for gap in sample_gaps if re.search(gap['pattern'], error)), None)
+        status, reason = ('not-covered', gap['reason']) if gap else ('drift', None)
     return _row(exercise, status, 'sample', 'run_sample', error=error, reason=reason)
 
 
