@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-Teaching material for a university course "IoT & Cloud Computing: Azure" (CDV). It is not one application: each numbered top-level directory (`1-cloud-account` … `18-timescaledb-terraform`) is a self-contained, student-facing exercise. The `readme.md` inside each exercise is the main deliverable; code, scripts and IaC files exist to support the steps it describes. There is no root build, test suite, linter or CI.
+Teaching material for a university course "IoT & Cloud Computing: Azure" (CDV). It is not one application: each numbered top-level directory (`1-cloud-account` … `18-timescaledb-terraform`) is a self-contained, student-facing exercise. The `readme.md` inside each exercise is the main deliverable; code, scripts and IaC files exist to support the steps it describes. There is no root build or linter; the one CI piece is the daily workflow `.github/workflows/cloud-api-check.yml`, which checks the exercises' cloud CLI commands, IaC and scripts against the real CLIs and local emulators (see Running things).
 
 ## Structure and how exercises relate
 
@@ -34,8 +34,9 @@ pip install -r requirements.txt
 - Terraform (14, 15, 18): `terraform init && terraform plan -out main.tfplan && terraform apply main.tfplan`; `terraform destroy` to clean up. State, lock files and plans are gitignored.
 - Frontend (`11-serverless-iot-platform/example-frontend`): `npm install`, `npm run dev`, `npm run build`, `npm run lint`, `npm run type-check`. `deploy-frontend.sh` deploys it to Blob static website hosting.
 - TimescaleDB (18): `docker compose up -d`, then `init_database.py`, `generate_data.py`, `api.py`, `client_test.py`.
+- Daily API check (`.github/workflows/cloud-api-check.yml`, 05:00 UTC and `workflow_dispatch`): job `azure` runs an `az` help check of every `az` command and flag in readmes and scripts, `az bicep build`, `terraform validate`, an install and import of the pinned requirements, and exercise 9 against the Cosmos DB emulator; job `aws` runs an `aws` help check, cfn-lint, the listed AWS scripts, and CloudFormation and Terraform against AWS Emulator. Each job writes a summary per exercise and fails on drift. Known emulator differences are recorded in `.github/api-check/targets.yml` (`emulator_gaps`, `skip`), each with a reason; fix real drift in the exercise, don't hide it there. GitHub pauses scheduled workflows after 60 days without repository activity (re-enable on the Actions page). Run locally from the repository root, in a venv: `pip install -r .github/api-check/requirements.txt`, `pytest .github/api-check`, `python .github/api-check/check_cli.py --cloud aws|azure`; set `AZURE_CONFIG_DIR` to a temporary directory so local `az` runs don't change `~/.azure`.
 
-Validating a change usually means deploying to a real Azure subscription; there are no offline tests. When editing IaC, at least run `az bicep build --file main.bicep` or `terraform validate` / `terraform fmt`.
+Offline checks exist (CLI commands, IaC, pinned requirements, AWS scripts against AWS Emulator, see the API check above), but validating a change end to end still means deploying to a real Azure subscription. When editing IaC, at least run `az bicep build --file main.bicep` or `terraform validate` / `terraform fmt`.
 
 ## Conventions for exercise content
 

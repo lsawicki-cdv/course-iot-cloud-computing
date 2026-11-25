@@ -20,6 +20,8 @@ This course provides an in-depth understanding of IoT and Cloud Computing using 
 
 Every exercise is written for **Azure**. Exercises that also have an **AWS** version keep it in an `aws/` subfolder (for example [2-iaas/aws](2-iaas/aws/readme.md)), linked at the top of the Azure readme. The AWS versions are written for a personal AWS account and use Free Tier eligible services where possible; an AWS Academy Learner Lab account also works, with the limits listed in [1-cloud-account/aws](1-cloud-account/aws/readme.md), which explains how to set up either one.
 
+A [daily check](https://github.com/lsawicki-cdv/course-iot-cloud-computing/actions/workflows/cloud-api-check.yml) verifies the CLI commands, IaC and scripts of the exercises against the current Azure and AWS tools.
+
 Exercises with an AWS version:
 - 1 - Cloud account
 - 2 - IaaS (Virtual Machine / EC2)
