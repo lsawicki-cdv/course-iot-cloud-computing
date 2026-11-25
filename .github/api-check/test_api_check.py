@@ -665,12 +665,12 @@ def fake_timeout(tmp_path, env):
 def test_aws_shim_default_and_deploy_timeouts(tmp_path, shim_env):
     args = fake_timeout(tmp_path, shim_env)
     run_shim('aws', shim_env, 's3', 'ls')
-    assert args.read_text().startswith('--kill-after=5 120 ')
+    assert args.read_text().startswith('--foreground --kill-after=5 120 ')
     run_shim('aws', shim_env, 'cloudformation', 'deploy', '--stack-name', 's')
-    assert args.read_text().startswith('--kill-after=5 600 ')
+    assert args.read_text().startswith('--foreground --kill-after=5 600 ')
     shim_env['API_CHECK_AWS_TIMEOUT'] = '7'
     run_shim('aws', shim_env, 'cloudformation', 'deploy')
-    assert args.read_text().startswith('--kill-after=5 7 ')
+    assert args.read_text().startswith('--foreground --kill-after=5 7 ')
 
 
 def test_aws_shim_timeout_kills_and_logs(tmp_path, shim_env):
@@ -680,6 +680,22 @@ def test_aws_shim_timeout_kills_and_logs(tmp_path, shim_env):
     assert result.returncode != 0
     (entry,) = raw_calls(shim_env)
     assert entry['timed_out'] is True
+
+
+def test_group_kill_leaves_no_aws_call_process(tmp_path, shim_env):
+    marker = f'apicheck-{tmp_path.name}'
+    fake_script(tmp_path / 'real-aws', f'(exec -a sleep-{marker} sleep 30) &\nwait\n')
+    try:
+        code = run_aws_targets.run_group([str(SHIMS / 'aws'), 's3', marker], tmp_path / 'log', tmp_path, 1, shim_env)
+        assert code is None
+        for _ in range(50):
+            if subprocess.run(['pgrep', '-f', marker], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.1)
+        else:
+            pytest.fail('a process of the aws call outlived the group kill')
+    finally:
+        subprocess.run(['pkill', '-9', '-f', marker], check=False)
 
 
 def test_aws_shim_works_without_yaml_from_another_directory(tmp_path, shim_env):

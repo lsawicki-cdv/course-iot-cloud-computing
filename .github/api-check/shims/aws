@@ -7,7 +7,7 @@ timeout_s=${API_CHECK_AWS_TIMEOUT:-$timeout_s}
 stderr_file=$(mktemp)
 trap 'rm -f "$stderr_file"' EXIT
 
-timeout --kill-after=5 "$timeout_s" "$API_CHECK_REAL_AWS" "$@" 2>"$stderr_file"
+timeout --foreground --kill-after=5 "$timeout_s" "$API_CHECK_REAL_AWS" "$@" 2>"$stderr_file"
 status=$?
 cat "$stderr_file" >&2
 
